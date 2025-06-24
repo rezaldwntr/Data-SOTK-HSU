@@ -1,0 +1,134 @@
+import pandas as pd
+import numpy as np
+import streamlit as st
+
+file_sotk = st.file_uploader("Pilih File")
+if file_sotk is not None:
+    dataFrame = pd.read_excel(file_sotk)
+
+    file_path = file_sotk
+    df = pd.read_excel(file_path)
+
+    id_to_nama_unor = df.set_index('ID')['NAMA UNOR'].to_dict()
+    df['NAMA ATASAN'] = df['DIATASAN ID'].map(id_to_nama_unor)
+
+    df['NAMA UNOR'] = df['NAMA UNOR'].str.lstrip('-')
+    df['NAMA ATASAN'] = df['NAMA ATASAN'].astype(str).str.lstrip('-')
+
+
+    cols = df.columns.tolist()
+
+    try:
+        diatasan_id_index = cols.index('DIATASAN ID')
+        nama_atasan_index = cols.index('NAMA ATASAN')
+
+        if 'NAMA ATASAN' in cols:
+            cols.pop(nama_atasan_index)
+
+        cols.insert(diatasan_id_index + 1, 'NAMA ATASAN')
+
+        df = df[cols]
+
+    except ValueError as e:
+        print(f"Kolom Tidak Ditemukan: {e}")
+
+
+    def split_corder_by_width(corder):
+        if not isinstance(corder, str):
+            return [None] * 6 
+
+        codes = []
+        start = 0
+        while start < len(corder):
+            end = min(start + 37, len(corder))
+            codes.append(corder[start:end])
+            start += 37
+
+        if len(codes) > 1 and len(codes[-1]) < 36:
+            last_code = codes.pop()
+            codes[-1] += last_code
+
+        while len(codes) < 6:
+            codes.append(None)
+
+        return codes[:6]
+
+    df[['code_1', 'code_2', 'code_3', 'code_4', 'code_5', 'code_6']] = df['CORDER'].apply(split_corder_by_width).tolist()
+
+    for col in ['code_1', 'code_2', 'code_3', 'code_4', 'code_5', 'code_6']:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str[4:]
+        else:
+            print(f"Kolom {col} Tidak Ditemukan.")
+
+    for col in ['code_1', 'code_2', 'code_3', 'code_4', 'code_5', 'code_6']:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.rstrip('-')
+        else:
+            print(f"Kolom {col} Tidak Ditemukan.")
+
+    for col in ['code_1', 'code_2', 'code_3', 'code_4', 'code_5', 'code_6']:
+        if col in df.columns:
+            df[col] = df[col].map(id_to_nama_unor)
+            df[col] = df[col].astype(str).str.lstrip('-')
+        else:
+            print(f"Kolom {col} Tidak Ditemukan.")
+
+
+    df = df.drop(columns=['DIATASAN ID', 'ROOT ID','ROW LEVEL','URUTAN','AKTIF','CORDER','INDUK UNOR ID'])
+
+    rename_dict = {f'code_{i}': f'Level {i}' for i in range(1, 7)}
+    df = df.rename(columns=rename_dict)
+    df = df.replace([np.nan, 'nan'], '-')
+
+    st.dataframe(df)
+
+    level2_group = df.groupby('Level 2').size().reset_index(name='Count')
+    pilihdinas = st.selectbox(
+        "Pilih Dinas",
+        level2_group['Level 2'],
+        index=None,
+        placeholder="Pilih Dinas",
+        accept_new_options=True)
+
+    filtered_df = df[df['Level 2'] == pilihdinas]
+    if filtered_df:
+        df['TOTAL KEBUTUHAN'] = pd.to_numeric(df['TOTAL KEBUTUHAN'], errors='coerce')
+
+        # total_kebutuhan_by_level2 = df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
+
+        total_kebutuhan_dinas = filtered_df['TOTAL KEBUTUHAN'].sum()
+        st.caption(f"Total Kebutuhan untuk {pilihdinas} : {total_kebutuhan_dinas}")
+
+        dinas_df = df[df['Level 2'] == pilihdinas].copy()
+
+        total_kebutuhan_dinas_by_all_levels = dinas_df.groupby(['Level 3', 'Level 4', 'Level 5', 'Level 6'])['TOTAL KEBUTUHAN'].sum().reset_index()
+        st.dataframe(total_kebutuhan_dinas_by_all_levels)
+
+    def search_by_id_and_display_levels(df, search_id):
+        result_row = df[df['ID'] == search_id]
+
+        if not result_row.empty:
+            level_cols_data = result_row[[f'Level {i}' for i in range(1, 7) if f'Level {i}' in result_row.columns]]
+
+            level_values = level_cols_data.iloc[0].astype(str).replace('nan', '').tolist()
+            filtered_levels = [level for level in level_values if level] # Remove empty strings
+
+            if filtered_levels:
+                st.caption(f"Letak ID : {'|'.join(filtered_levels)}")
+                # print(f"Levels for ID {search_id}: {'|'.join(filtered_levels)}")
+            else:
+                st.caption("Lokasi Tidak Ditemukan")
+        else:
+            st.caption("Lokasi Tidak Ditemukan")
+    cari_id = st.text_input(
+        "Input ID",
+        label_visibility=st.session_state.visibility,
+        disabled=st.session_state.disabled,
+        placeholder=st.session_state.placeholder,
+    )
+    if cari_id:
+        search_by_id_and_display_levels(df, cari_id)
+
+else:
+    st.header("Upload Dululah Filenya", divider=True)
