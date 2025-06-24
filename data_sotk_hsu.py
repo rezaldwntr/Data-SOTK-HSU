@@ -90,20 +90,20 @@ if file_sotk is not None:
         index=None,
         placeholder="Pilih Dinas",
         accept_new_options=True)
+    if pilihdinas is not None:
+        filtered_df = df[df['Level 2'] == pilihdinas]
+        if filtered_df is not None:
+            df['TOTAL KEBUTUHAN'] = pd.to_numeric(df['TOTAL KEBUTUHAN'], errors='coerce')
 
-    filtered_df = df[df['Level 2'] == pilihdinas]
-    if filtered_df is not None:
-        df['TOTAL KEBUTUHAN'] = pd.to_numeric(df['TOTAL KEBUTUHAN'], errors='coerce')
+            # total_kebutuhan_by_level2 = df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
 
-        # total_kebutuhan_by_level2 = df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
+            total_kebutuhan_dinas = filtered_df['TOTAL KEBUTUHAN'].sum()
+            st.caption(f"Total Kebutuhan untuk {pilihdinas} : {total_kebutuhan_dinas}")
 
-        total_kebutuhan_dinas = filtered_df['TOTAL KEBUTUHAN'].sum()
-        st.caption(f"Total Kebutuhan untuk {pilihdinas} : {total_kebutuhan_dinas}")
+            dinas_df = df[df['Level 2'] == pilihdinas].copy()
 
-        dinas_df = df[df['Level 2'] == pilihdinas].copy()
-
-        total_kebutuhan_dinas_by_all_levels = dinas_df.groupby(['Level 3', 'Level 4', 'Level 5', 'Level 6'])['TOTAL KEBUTUHAN'].sum().reset_index()
-        st.dataframe(total_kebutuhan_dinas_by_all_levels)
+            total_kebutuhan_dinas_by_all_levels = dinas_df.groupby(['Level 3', 'Level 4', 'Level 5', 'Level 6'])['TOTAL KEBUTUHAN'].sum().reset_index()
+            st.dataframe(total_kebutuhan_dinas_by_all_levels)
 
     def search_by_id_and_display_levels(df, search_id):
         result_row = df[df['ID'] == search_id]
