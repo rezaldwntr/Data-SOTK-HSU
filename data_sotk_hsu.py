@@ -97,7 +97,7 @@ if file_sotk is not None:
 
             # total_kebutuhan_by_level2 = df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
 
-            total_kebutuhan_dinas = filtered_df['TOTAL KEBUTUHAN'].sum()
+            total_kebutuhan_dinas = df['TOTAL KEBUTUHAN'].sum()
             st.caption(f"Total Kebutuhan untuk {pilihdinas} : {total_kebutuhan_dinas}")
 
             dinas_df = df[df['Level 2'] == pilihdinas].copy()
