@@ -122,10 +122,7 @@ if file_sotk is not None:
         else:
             st.caption("Lokasi Tidak Ditemukan")
     cari_id = st.text_input(
-        "Input ID",
-        label_visibility=st.session_state.visibility,
-        disabled=st.session_state.disabled,
-        placeholder=st.session_state.placeholder,
+        "Input ID"
     )
     if cari_id:
         search_by_id_and_display_levels(df, cari_id)
