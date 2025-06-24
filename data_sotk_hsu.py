@@ -92,7 +92,7 @@ if file_sotk is not None:
         accept_new_options=True)
 
     filtered_df = df[df['Level 2'] == pilihdinas]
-    if filtered_df:
+    if filtered_df is not None:
         df['TOTAL KEBUTUHAN'] = pd.to_numeric(df['TOTAL KEBUTUHAN'], errors='coerce')
 
         # total_kebutuhan_by_level2 = df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
