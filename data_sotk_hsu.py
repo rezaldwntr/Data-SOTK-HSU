@@ -143,7 +143,7 @@ if file_sotk is not None:
             accept_new_options=True)
         if pilihlistdinas is not None:
             filtered_dinas_kesehatan = df1[df1['Level 2'] == pilihlistdinas].copy()
-            st.dataframe(filtered_dinas_kesehatan)
+            st.table(filtered_dinas_kesehatan)
 
 else:
     st.header("Upload Dululah Filenya", divider=True)
