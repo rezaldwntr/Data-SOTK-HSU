@@ -136,10 +136,10 @@ if file_sotk is not None:
         st.caption("SKPD yang belum melakukan Kunci Validasi")
         st.dataframe(level2_counts)
         pilihlistdinas = st.selectbox(
-            "Pilih Dinas",
+            "Pilih List Dinas",
             level2_counts['Level 2'],
             index=None,
-            placeholder="Pilih Dinas",
+            placeholder="Pilih List Dinas",
             accept_new_options=True)
         if pilihlistdinas is not None:
             filtered_dinas_kesehatan = df1[df1['Level 2'] == pilihlistdinas].copy()
