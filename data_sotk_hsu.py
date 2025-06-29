@@ -143,7 +143,7 @@ if file_sotk is not None:
         if pilihlistdinas is not None:
             filtered_dinas_kesehatan = df1[df1['Level 2'] == pilihlistdinas].copy()
             tampildataperlv2 = filtered_dinas_kesehatan.groupby(['NAMA UNOR', 'NAMA SUB JABATAN','NAMA ATASAN','UNOR INDUK','TOTAL KEBUTUHAN','Level 2','Level 3','Level 4'])
-            st.dataframe(tampildataperlv2)
+            st.dataframe(tampildataperlv2.size().reset_index())
 
 else:
     st.header("Upload Dululah Filenya", divider=True)
