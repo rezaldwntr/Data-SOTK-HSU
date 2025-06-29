@@ -126,6 +126,25 @@ if file_sotk is not None:
     )
     if cari_id:
         search_by_id_and_display_levels(df, cari_id)
+    
+    file_list = st.file_uploader("Pilih File")
+    if file_list is not None:
+        level_cols = ['ID','Level 2', 'Level 3', 'Level 4']
+        df_levels = df[level_cols]
+        file_list = pd.merge(file_list, df_levels, on='ID', how='left')
+        grouped_df1 = file_list.groupby('Level 2')
+        level2_counts = grouped_df1.size().reset_index(name='Count')
+        st.dataframe(level2_counts)
+        pilihlistdinas = st.selectbox(
+            "Pilih Dinas",
+            level2_counts['Level 2'],
+            index=None,
+            placeholder="Pilih Dinas",
+            accept_new_options=True)
+        if pilihlistdinas is not None:
+            filtered_dinas_kesehatan = file_list[file_list['Level 2'] == pilihlistdinas].copy()
+            tampildataperlv2 = filtered_dinas_kesehatan.groupby(['NAMA UNOR', 'NAMA SUB JABATAN','NAMA ATASAN','UNOR INDUK','TOTAL KEBUTUHAN','Level 2','Level 3','Level 4'])
+            st.dataframe(tampildataperlv2)
 
 else:
     st.header("Upload Dululah Filenya", divider=True)
