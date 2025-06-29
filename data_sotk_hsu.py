@@ -2,10 +2,8 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-file_sotk = st.file_uploader("Pilih File SOTK")
+file_sotk = st.file_uploader("Pilih File")
 if file_sotk is not None:
-    dataFrame = pd.read_excel(file_sotk)
-
     file_path = file_sotk
     df = pd.read_excel(file_path)
 
@@ -127,12 +125,13 @@ if file_sotk is not None:
     if cari_id:
         search_by_id_and_display_levels(df, cari_id)
     
-    file_list = st.file_uploader("Pilih File Listing")
+    file_list = st.file_uploader("Pilih File")
     if file_list is not None:
+        df1 = pd.read_excel(file_list)
         level_cols = ['ID','Level 2', 'Level 3', 'Level 4']
         df_levels = df[level_cols]
-        file_list = pd.merge(file_list, df_levels, on='ID', how='left')
-        grouped_df1 = file_list.groupby('Level 2')
+        df1 = pd.merge(df1, df_levels, on='ID', how='left')
+        grouped_df1 = df1.groupby('Level 2')
         level2_counts = grouped_df1.size().reset_index(name='Count')
         st.dataframe(level2_counts)
         pilihlistdinas = st.selectbox(
@@ -142,7 +141,7 @@ if file_sotk is not None:
             placeholder="Pilih Dinas",
             accept_new_options=True)
         if pilihlistdinas is not None:
-            filtered_dinas_kesehatan = file_list[file_list['Level 2'] == pilihlistdinas].copy()
+            filtered_dinas_kesehatan = df1[df1['Level 2'] == pilihlistdinas].copy()
             tampildataperlv2 = filtered_dinas_kesehatan.groupby(['NAMA UNOR', 'NAMA SUB JABATAN','NAMA ATASAN','UNOR INDUK','TOTAL KEBUTUHAN','Level 2','Level 3','Level 4'])
             st.dataframe(tampildataperlv2)
 
