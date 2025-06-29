@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-file_sotk = st.file_uploader("Pilih File")
+file_sotk = st.file_uploader("Pilih File SOTK")
 if file_sotk is not None:
     dataFrame = pd.read_excel(file_sotk)
 
@@ -127,7 +127,7 @@ if file_sotk is not None:
     if cari_id:
         search_by_id_and_display_levels(df, cari_id)
     
-    file_list = st.file_uploader("Pilih File")
+    file_list = st.file_uploader("Pilih File Listing")
     if file_list is not None:
         level_cols = ['ID','Level 2', 'Level 3', 'Level 4']
         df_levels = df[level_cols]
