@@ -133,6 +133,7 @@ if file_sotk is not None:
         df1 = pd.merge(df1, df_levels, on='ID', how='left')
         grouped_df1 = df1.groupby('Level 2')
         level2_counts = grouped_df1.size().reset_index(name='Count')
+        df1 = df1.drop(columns=['DIATASAN ID', 'ROOT ID','ROW LEVEL','URUTAN','AKTIF','CORDER','INDUK UNOR ID'])
         st.caption("SKPD yang belum melakukan Kunci Validasi")
         st.dataframe(level2_counts)
         pilihlistdinas = st.selectbox(
@@ -143,7 +144,16 @@ if file_sotk is not None:
             accept_new_options=True)
         if pilihlistdinas is not None:
             filtered_dinas_kesehatan = df1[df1['Level 2'] == pilihlistdinas].copy()
-            st.table(filtered_dinas_kesehatan)
+            st.dataframe(filtered_dinas_kesehatan)
+            pilihbidang = st.selectbox(
+                "Pilih Bidang",
+                filtered_dinas_kesehatan['Level 3'],
+                index=None,
+                placeholder="Pilih Bidang",
+                accept_new_option=True)
+            if pilihbidang is not None:
+                filtered_dinas_kesehatan_sungai_malang = filtered_dinas_kesehatan[filtered_dinas_kesehatan['Level 3'] == pilihbidang].copy()
+                st.dataframe(filtered_dinas_kesehatan_sungai_malang)
 
 else:
     st.header("Upload Dululah Filenya", divider=True)
