@@ -133,7 +133,7 @@ if file_sotk is not None:
         df1 = pd.merge(df1, df_levels, on='ID', how='left')
         grouped_df1 = df1.groupby('Level 2')
         level2_counts = grouped_df1.size().reset_index(name='Count')
-        df1 = df1.drop(columns=['DIATASAN ID', 'ROOT ID','ROW LEVEL','URUTAN','AKTIF','CORDER','INDUK UNOR ID'])
+        #df1 = df1.drop(columns=['DIATASAN ID', 'ROOT ID','ROW LEVEL','URUTAN','AKTIF','CORDER','INDUK UNOR ID'])
         st.caption("SKPD yang belum melakukan Kunci Validasi")
         st.dataframe(level2_counts)
         pilihlistdinas = st.selectbox(
