@@ -152,7 +152,7 @@ if file_sotk is not None:
                 gruplv3_count['Level 3'],
                 index=None,
                 placeholder="Pilih Bidang",
-                accept_new_option=True)
+                accept_new_options=True)
             if pilihbidang is not None:
                 filtered_dinas_kesehatan_sungai_malang = filtered_dinas_kesehatan[filtered_dinas_kesehatan['Level 3'] == pilihbidang].copy()
                 st.dataframe(filtered_dinas_kesehatan_sungai_malang)
