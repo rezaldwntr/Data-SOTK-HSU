@@ -79,83 +79,100 @@ if file_sotk is not None:
     df = df.rename(columns=rename_dict)
     df = df.replace([np.nan, 'nan'], '-')
 
-    st.dataframe(df)
+    # st.dataframe(df)
 
     level2_group = df.groupby('Level 2').size().reset_index(name='Count')
-    pilihdinas = st.selectbox(
-        "Pilih Dinas",
-        level2_group['Level 2'],
-        index=None,
-        placeholder="Pilih Dinas",
-        accept_new_options=True)
-    if pilihdinas is not None:
-        filtered_df = df[df['Level 2'] == pilihdinas]
-        if filtered_df is not None:
-            df['TOTAL KEBUTUHAN'] = pd.to_numeric(df['TOTAL KEBUTUHAN'], errors='coerce')
+    
+    tab1, tab2, tab3 = st.tabs(["SOTK Per SKPD", "Cari Dengan ID", "Listing Validasi"])
+    with tab1:
+        pilihdinas = st.selectbox(
+            "Pilih Dinas",
+            level2_group['Level 2'],
+            index=None,
+            placeholder="Pilih Dinas",
+            accept_new_options=True)
+        if pilihdinas is not None:
+            filtered_df = df[df['Level 2'] == pilihdinas]
+            if filtered_df is not None:
+                df['TOTAL KEBUTUHAN'] = pd.to_numeric(filtered_df['TOTAL KEBUTUHAN'], errors='coerce')
 
-            # total_kebutuhan_by_level2 = df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
+                # total_kebutuhan_by_level2 = df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
 
-            total_kebutuhan_dinas = df['TOTAL KEBUTUHAN'].sum()
-            st.caption(f"Total Kebutuhan untuk {pilihdinas} : {total_kebutuhan_dinas}")
+                total_kebutuhan_dinas = df['TOTAL KEBUTUHAN'].sum()
+                st.caption(f"Total Kebutuhan untuk {pilihdinas} : {total_kebutuhan_dinas}")
 
-            dinas_df = df[df['Level 2'] == pilihdinas].copy()
+                dinas_df = df[df['Level 2'] == pilihdinas].copy()
 
-            total_kebutuhan_dinas_by_all_levels = dinas_df.groupby(['Level 3', 'Level 4', 'Level 5', 'Level 6'])['TOTAL KEBUTUHAN'].sum().reset_index()
-            st.dataframe(total_kebutuhan_dinas_by_all_levels)
+                total_kebutuhan_dinas_by_all_levels = dinas_df.groupby(['Level 3', 'Level 4', 'Level 5', 'Level 6'])['TOTAL KEBUTUHAN'].sum().reset_index()
+                st.dataframe(total_kebutuhan_dinas_by_all_levels)
+                grupbid = dinas_df.groupby('Level 3').size().reset_index(name='Count')
+                pilihbidangsotk = st.selectbox(
+                    "Pilih Bidang",
+                    grupbid['Level 3'],
+                    index=None,
+                    placeholder="Pilih Bidang",
+                    accept_new_options=True
+                )
+                if pilihbidangsotk is not None:
+                    bidang_df = total_kebutuhan_dinas_by_all_levels[total_kebutuhan_dinas_by_all_levels['Level 3'] == pilihbidangsotk].copy()
+                    total_kebutuhan_bidang = bidang_df['TOTAL KEBUTUHAN'].sum()
+                    st.caption(f"Total Kebutuhan Untuk {pilihbidangsotk} : {total_kebutuhan_bidang}")
+                    st.dataframe(bidang_df)
 
-    def search_by_id_and_display_levels(df, search_id):
-        result_row = df[df['ID'] == search_id]
+    with tab2:
+        def search_by_id_and_display_levels(df, search_id):
+            result_row = df[df['ID'] == search_id]
 
-        if not result_row.empty:
-            level_cols_data = result_row[[f'Level {i}' for i in range(1, 7) if f'Level {i}' in result_row.columns]]
+            if not result_row.empty:
+                level_cols_data = result_row[[f'Level {i}' for i in range(1, 7) if f'Level {i}' in result_row.columns]]
 
-            level_values = level_cols_data.iloc[0].astype(str).replace('nan', '').tolist()
-            filtered_levels = [level for level in level_values if level] # Remove empty strings
+                level_values = level_cols_data.iloc[0].astype(str).replace('nan', '').tolist()
+                filtered_levels = [level for level in level_values if level] # Remove empty strings
 
-            if filtered_levels:
-                st.caption(f"Letak ID : {'|'.join(filtered_levels)}")
-                # print(f"Levels for ID {search_id}: {'|'.join(filtered_levels)}")
+                if filtered_levels:
+                    st.caption(f"Letak ID : {'|'.join(filtered_levels)}")
+                    # print(f"Levels for ID {search_id}: {'|'.join(filtered_levels)}")
+                else:
+                    st.caption("Lokasi Tidak Ditemukan")
             else:
                 st.caption("Lokasi Tidak Ditemukan")
-        else:
-            st.caption("Lokasi Tidak Ditemukan")
-    cari_id = st.text_input(
-        "Input ID"
-    )
-    if cari_id:
-        search_by_id_and_display_levels(df, cari_id)
+        cari_id = st.text_input(
+            "Cari dengan ID"
+        )
+        if cari_id:
+            search_by_id_and_display_levels(df, cari_id)
     
-    file_list = st.file_uploader("Pilih File Listing")
-    if file_list is not None:
-        df1 = pd.read_excel(file_list)
-        level_cols = ['ID','Level 2', 'Level 3', 'Level 4']
-        df_levels = df[level_cols]
-        df1 = pd.merge(df1, df_levels, on='ID', how='left')
-        grouped_df1 = df1.groupby('Level 2')
-        level2_counts = grouped_df1.size().reset_index(name='Count')
-        # df1 = df1.drop(columns=['DIATASAN ID', 'ROOT ID','ROW LEVEL','URUTAN','AKTIF','CORDER','INDUK UNOR ID'])
-        st.caption("SKPD yang belum melakukan Kunci Validasi")
-        st.dataframe(level2_counts)
-        pilihlistdinas = st.selectbox(
-            "Pilih List Dinas",
-            level2_counts['Level 2'],
-            index=None,
-            placeholder="Pilih List Dinas",
-            accept_new_options=True)
-        if pilihlistdinas is not None:
-            filtered_dinas_kesehatan = df1[df1['Level 2'] == pilihlistdinas].copy()
-            st.dataframe(filtered_dinas_kesehatan)
-            gruplv3 = filtered_dinas_kesehatan.groupby('Level 3')
-            gruplv3_count = gruplv3.size().reset_index(name='Count')
-            pilihbidang = st.selectbox(
-                "Pilih Bidang",
-                gruplv3_count['Level 3'],
+    with tab3:
+        file_list = st.file_uploader("Pilih File Listing")
+        if file_list is not None:
+            df1 = pd.read_excel(file_list)
+            level_cols = ['ID','Level 2', 'Level 3', 'Level 4']
+            df_levels = df[level_cols]
+            df1 = pd.merge(df1, df_levels, on='ID', how='left')
+            grouped_df1 = df1.groupby('Level 2')
+            level2_counts = grouped_df1.size().reset_index(name='Count')
+            st.caption("SKPD yang belum melakukan Kunci Validasi")
+            st.dataframe(level2_counts)
+            pilihlistdinas = st.selectbox(
+                "Pilih List Dinas",
+                level2_counts['Level 2'],
                 index=None,
-                placeholder="Pilih Bidang",
+                placeholder="Pilih List Dinas",
                 accept_new_options=True)
-            if pilihbidang is not None:
-                filtered_dinas_kesehatan_sungai_malang = filtered_dinas_kesehatan[filtered_dinas_kesehatan['Level 3'] == pilihbidang].copy()
-                st.dataframe(filtered_dinas_kesehatan_sungai_malang)
+            if pilihlistdinas is not None:
+                filterdinaslisting = df1[df1['Level 2'] == pilihlistdinas].copy()
+                st.dataframe(filterdinaslisting)
+                gruplv3 = filterdinaslisting.groupby('Level 3')
+                lv3grup = gruplv3.size().reset_index(name='Count')
+                pilihbidang = st.selectbox(
+                    "Pilih List Bidang",
+                    lv3grup['Level 3'],
+                    index=None,
+                    placeholder="Pilih List Bidang",
+                    accept_new_options=True)
+                if pilihbidang is not None:
+                    filterbidangdinas = filterdinaslisting[filterdinaslisting['Level 3'] == pilihbidang].copy()
+                    st.dataframe(filterbidangdinas)
 
 else:
     st.header("Upload Dululah Filenya", divider=True)
