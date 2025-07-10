@@ -148,7 +148,7 @@ if file_sotk is not None:
             filtered_rows = df[df['NAMA UNOR'].str.contains(search_term, case=False, na=False)].copy() # Add .copy() to avoid SettingWithCopyWarning
             if not filtered_rows.empty:
                 st.caption(f"Found {len(filtered_rows)} rows matching '{search_term}' in NAMA UNOR:")
-                selected_columns = ['NAMA UNOR', 'NAMA ATASAN', 'INDUK UNOR NAMA', 'TOTAL KEBUTUHAN']
+                selected_columns = ['NAMA UNOR', 'NAMA ATASAN', 'INDUK UNOR NAMA', 'Level 2','TOTAL KEBUTUHAN']
                 st.dataframe(filtered_rows[selected_columns])
                 total_kebutuhan_sum = filtered_rows['TOTAL KEBUTUHAN'].sum()
                 st.caption(f"\nTotal Kebutuhan for '{search_term}': {total_kebutuhan_sum}")
