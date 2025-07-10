@@ -83,7 +83,7 @@ if file_sotk is not None:
 
     level2_group = df.groupby('Level 2').size().reset_index(name='Count')
     
-    tab1, tab2, tab3 = st.tabs(["SOTK Per SKPD", "Cari Dengan ID", "Listing Validasi"])
+    tab1, tab2, tab3, tab4 = st.tabs(["SOTK Per SKPD", "Cari Dengan ID", "Cari Dengan Nama", "Listing Validasi"])
     with tab1:
         pilihdinas = st.selectbox(
             "Pilih Dinas",
@@ -143,6 +143,26 @@ if file_sotk is not None:
             search_by_id_and_display_levels(df, cari_id)
     
     with tab3:
+        def search_by_nama_unor_and_display(df, search_term):
+            df['NAMA UNOR'] = df['NAMA UNOR'].astype(str)
+            filtered_rows = df[df['NAMA UNOR'].str.contains(search_term, case=False, na=False)].copy() # Add .copy() to avoid SettingWithCopyWarning
+            if not filtered_rows.empty:
+                st.caption(f"Found {len(filtered_rows)} rows matching '{search_term}' in NAMA UNOR:")
+                selected_columns = ['NAMA UNOR', 'NAMA ATASAN', 'INDUK UNOR NAMA', 'TOTAL KEBUTUHAN']
+                st.dataframe(filtered_rows[selected_columns])
+                total_kebutuhan_sum = filtered_rows['TOTAL KEBUTUHAN'].sum()
+                st.caption(f"\nTotal Kebutuhan for '{search_term}': {total_kebutuhan_sum}")
+
+            else:
+                st.caption(f"No data found for NAMA UNOR containing '{search_term}'.")
+
+        cari_nama = st.text_input(
+            "Cari Nama Unor"
+        )
+        if cari_nama:
+            search_by_nama_unor_and_display(df, cari_nama)       
+
+    with tab4:
         file_list = st.file_uploader("Pilih File Listing")
         if file_list is not None:
             df1 = pd.read_excel(file_list)
