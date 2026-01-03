@@ -62,31 +62,26 @@ def tampilkan_dan_download(df_input, file_label, height=None):
     if 'Jumlah Unit' in df_show.columns:
         col_config['Jumlah Unit'] = st.column_config.NumberColumn("Jumlah Unit", format="%.0f")
 
-    # --- PERBAIKAN ERROR HEIGHT DISINI ---
-    # Kita menyusun argumen dalam dictionary, lalu hanya memasukkan 'height' jika ada nilainya.
-    # Ini mencegah pengiriman height=None yang menyebabkan error.
+    # --- PERBAIKAN ERROR HEIGHT ---
+    # Menyusun argumen secara dinamis untuk menghindari passing height=None
     dataframe_args = {
         "use_container_width": True,
         "hide_index": True,
         "column_config": col_config
     }
-    
-    if height:  # Jika height ada isinya (misal 500), baru dimasukkan
+    if height: # Hanya tambahkan height jika ada nilainya
         dataframe_args["height"] = height
     
-    # Render Tabel dengan argumen dinamis
     st.dataframe(df_show, **dataframe_args)
 
     # PEMBUATAN FILE DOWNLOAD (SAFE MODE)
     try:
         buffer = io.BytesIO()
-        # Gunakan 'openpyxl' engine
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df_show.to_excel(writer, index=False, sheet_name='Data')
         
         safe_label = sanitize_filename(file_label)
-        # Gunakan UUID agar key selalu unik dan tidak bentrok (DuplicateWidgetID Error)
-        unique_key = f"btn_{safe_label}_{uuid.uuid4()}"
+        unique_key = f"btn_{safe_label}_{uuid.uuid4()}" # UUID untuk mencegah DuplicateWidgetID
         
         st.download_button(
             label=f"📥 Download Excel ({file_label})",
@@ -109,27 +104,21 @@ st.markdown("---")
 
 if file_sotk is not None:
     try:
-        # --- SMART LOAD: Deteksi Otomatis Excel vs CSV ---
+        # --- SMART LOAD ---
         try:
-            # Coba baca sebagai Excel dulu
             df = pd.read_excel(file_sotk)
         except:
-            # Jika gagal (misal file aslinya CSV tapi ekstensi xlsx, atau user upload CSV)
-            # Reset pointer file ke awal
             file_sotk.seek(0)
             df = pd.read_csv(file_sotk)
         
         # --- PROSES DATA ---
         with st.spinner('Sedang memproses struktur organisasi...'):
-            # Standarisasi Header (Huruf Besar & Strip spasi)
             df.columns = [str(c).strip().upper() for c in df.columns]
 
-            # Validasi Kolom Wajib
             if 'ID' not in df.columns or 'NAMA UNOR' not in df.columns:
                 st.error("❌ File wajib memiliki kolom 'ID' dan 'NAMA UNOR'.")
                 st.stop()
 
-            # Normalisasi Data (String Conversion)
             df['ID'] = df['ID'].astype(str).str.strip()
             df['NAMA UNOR'] = df['NAMA UNOR'].astype(str).str.lstrip('-')
             
@@ -139,15 +128,13 @@ if file_sotk is not None:
             if 'DIATASAN ID' in df.columns:
                 df['DIATASAN ID'] = df['DIATASAN ID'].astype(str).str.strip().replace(['nan', 'None', '', 'NaN'], np.nan)
 
-            # Mapping
             parent_map = df.set_index('ID')['DIATASAN ID'].to_dict()
             name_map = df.set_index('ID')['NAMA UNOR'].to_dict()
 
-            # Recursive Lineage (Lacak Hierarki)
             def get_lineage(node_id):
                 path = []
                 curr = node_id
-                for _ in range(10): # Max kedalaman 10
+                for _ in range(10):
                     if pd.isna(curr) or curr not in name_map: break
                     path.append(curr)
                     parent = parent_map.get(curr)
@@ -157,14 +144,12 @@ if file_sotk is not None:
 
             df['hierarchy_path'] = df['ID'].apply(get_lineage)
 
-            # Expand Levels
             hierarchy_df = pd.DataFrame(df['hierarchy_path'].tolist(), index=df.index)
             hierarchy_df = hierarchy_df.iloc[:, :6] 
             hierarchy_df.columns = [f'Level {i+1}' for i in range(hierarchy_df.shape[1])]
             
             df = pd.concat([df, hierarchy_df], axis=1)
 
-            # ID to Name conversion untuk kolom Level
             level_cols = [c for c in df.columns if c.startswith('Level ')]
             for col in level_cols:
                 df[col] = df[col].map(name_map).fillna('-')
@@ -172,11 +157,10 @@ if file_sotk is not None:
         if 'DIATASAN ID' in df.columns:
             df['NAMA ATASAN'] = df['DIATASAN ID'].map(name_map).fillna('-')
         
-        # Cleanup Kolom Teknis
         drop_cols = ['DIATASAN ID', 'ROOT ID', 'ROW LEVEL', 'URUTAN', 'AKTIF', 'CORDER', 'INDUK UNOR ID', 'hierarchy_path']
         df = df.drop(columns=[c for c in drop_cols if c in df.columns])
 
-        # --- DASHBOARD METRICS ---
+        # --- METRICS ---
         c1, c2, c3 = st.columns(3)
         c1.metric("Total Jabatan/Unit", f"{len(df):,}")
         c2.metric("Total Kebutuhan", f"{int(df['TOTAL KEBUTUHAN'].sum()):,}")
@@ -265,40 +249,76 @@ if file_sotk is not None:
                 if not res.empty:
                     st.info(f"Ditemukan {len(res)} data")
                     cols_show = ['NAMA UNOR'] + [c for c in df.columns if c.startswith('Level ')] + ['TOTAL KEBUTUHAN']
-                    # Filter kolom yang benar-benar ada
                     cols_show = [c for c in cols_show if c in res.columns]
                     tampilkan_dan_download(res[cols_show], f"Search_Nama_{cari_nama_tab}")
                 else:
                     st.warning("Tidak ditemukan")
 
-        # === TAB 5: VALIDASI ===
+        # === TAB 5: VALIDASI (DETAIL DIKEMBALIKAN) ===
         with tab5:
-            st.write("Upload File Listing (.xlsx / .csv)")
+            st.markdown("### 🔄 Validasi Data Listing")
+            st.write("Upload File Listing untuk melihat rekapitulasi dan detail data per SKPD.")
+            
             file_list = st.file_uploader("Upload File Listing", type=['xlsx', 'xls', 'csv'], key='list_up')
             
             if file_list and 'Level 2' in df.columns:
-                # Baca file listing (Auto-detect)
                 try:
-                    df_list = pd.read_excel(file_list)
-                except:
-                    file_list.seek(0)
-                    df_list = pd.read_csv(file_list)
+                    try:
+                        df_list = pd.read_excel(file_list)
+                    except:
+                        file_list.seek(0)
+                        df_list = pd.read_csv(file_list)
 
-                # Normalisasi Listing
-                df_list.columns = [str(c).strip().upper() for c in df_list.columns]
-                if 'ID' in df_list.columns:
-                    df_list['ID'] = df_list['ID'].astype(str).str.strip()
-                
-                cols_to_merge = ['ID', 'Level 2', 'Level 3']
-                cols_to_merge = [c for c in cols_to_merge if c in df.columns]
-                
-                df_merge = pd.merge(df_list, df[cols_to_merge], on='ID', how='left')
-                grp = df_merge.groupby('Level 2').size().reset_index(name='Jumlah')
-                tampilkan_dan_download(grp, "Hasil_Validasi_Listing")
+                    df_list.columns = [str(c).strip().upper() for c in df_list.columns]
+                    if 'ID' in df_list.columns:
+                        df_list['ID'] = df_list['ID'].astype(str).str.strip()
+                    
+                    cols_to_merge = ['ID', 'Level 2', 'Level 3']
+                    cols_to_merge = [c for c in cols_to_merge if c in df.columns]
+                    
+                    # Merge data listing dengan data SOTK
+                    df_merge = pd.merge(df_list, df[cols_to_merge], on='ID', how='left')
+                    
+                    # 1. Tampilkan Rekap
+                    grp = df_merge.groupby('Level 2').size().reset_index(name='Jumlah')
+                    st.markdown("#### 📊 Rekapitulasi Jumlah Pegawai per SKPD (Listing)")
+                    tampilkan_dan_download(grp, "Rekap_Validasi_Listing")
+                    
+                    st.divider()
+
+                    # 2. FITUR DETAIL (Dikembalikan)
+                    st.markdown("#### 📂 Detail Data Listing per SKPD")
+                    
+                    # Ambil daftar dinas yang valid
+                    list_dinas = sorted([x for x in df_merge['Level 2'].unique() if pd.notna(x) and str(x) != '-' and str(x) != 'nan'])
+                    
+                    pilih_dinas_val = st.selectbox("Pilih Unit Organisasi (Listing):", list_dinas, index=None)
+                    
+                    if pilih_dinas_val:
+                        # Filter berdasarkan Dinas
+                        detail_val = df_merge[df_merge['Level 2'] == pilih_dinas_val].copy()
+                        
+                        st.info(f"Menampilkan detail data untuk **{pilih_dinas_val}**")
+                        tampilkan_dan_download(detail_val, f"Listing_{pilih_dinas_val}")
+                        
+                        # Filter berdasarkan Bidang (Opsional)
+                        if 'Level 3' in detail_val.columns:
+                            list_bidang = sorted([x for x in detail_val['Level 3'].unique() if pd.notna(x) and str(x) != '-' and str(x) != 'nan'])
+                            
+                            if list_bidang:
+                                st.markdown("##### Filter Bidang (Opsional)")
+                                pilih_bidang_val = st.selectbox("Pilih Bidang (Listing):", list_bidang, index=None)
+                                
+                                if pilih_bidang_val:
+                                    detail_bidang_val = detail_val[detail_val['Level 3'] == pilih_bidang_val]
+                                    tampilkan_dan_download(detail_bidang_val, f"Listing_{pilih_bidang_val}")
+
+                except Exception as e:
+                    st.error(f"Terjadi kesalahan pada file listing: {e}")
 
     except Exception as e:
-        st.error(f"Terjadi Kesalahan: {e}")
-        st.info("Saran: Pastikan file yang diupload adalah file Excel (.xlsx) atau CSV dengan format kolom yang benar.")
+        st.error(f"Terjadi Kesalahan Aplikasi: {e}")
+        st.info("Tips: Pastikan file yang diupload memiliki format kolom yang sesuai.")
 
 else:
     st.info("👋 Silakan upload file SOTK (.xlsx / .csv) di panel sebelah kiri untuk memulai.")
