@@ -4,6 +4,7 @@ import streamlit as st
 import io
 import re
 import uuid
+import plotly.express as px  # Library Chart Modern
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(
@@ -35,7 +36,6 @@ st.markdown("""
 
 # --- 2. FUNGSI BANTUAN ---
 def sanitize_filename(name):
-    """Membersihkan string agar aman dijadikan nama file."""
     return re.sub(r'[\\/*?:"<>|]', "_", str(name)).strip()
 
 def tampilkan_dan_download(df_input, file_label, height=None):
@@ -45,7 +45,6 @@ def tampilkan_dan_download(df_input, file_label, height=None):
 
     df_show = df_input.copy()
 
-    # Rename kolom agar lebih rapi
     rename_map = {
         'NAMA UNOR': 'Nama Unit Kerja',
         'TOTAL KEBUTUHAN': 'Kebutuhan Pegawai',
@@ -55,33 +54,29 @@ def tampilkan_dan_download(df_input, file_label, height=None):
     }
     df_show = df_show.rename(columns={k: v for k, v in rename_map.items() if k in df_show.columns})
 
-    # Konfigurasi kolom
     col_config = {}
     if 'Kebutuhan Pegawai' in df_show.columns:
         col_config['Kebutuhan Pegawai'] = st.column_config.NumberColumn("Kebutuhan Pegawai", format="%.0f")
     if 'Jumlah Unit' in df_show.columns:
         col_config['Jumlah Unit'] = st.column_config.NumberColumn("Jumlah Unit", format="%.0f")
 
-    # --- PERBAIKAN ERROR HEIGHT ---
-    # Menyusun argumen secara dinamis untuk menghindari passing height=None
     dataframe_args = {
         "use_container_width": True,
         "hide_index": True,
         "column_config": col_config
     }
-    if height: # Hanya tambahkan height jika ada nilainya
+    if height: 
         dataframe_args["height"] = height
     
     st.dataframe(df_show, **dataframe_args)
 
-    # PEMBUATAN FILE DOWNLOAD (SAFE MODE)
     try:
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df_show.to_excel(writer, index=False, sheet_name='Data')
         
         safe_label = sanitize_filename(file_label)
-        unique_key = f"btn_{safe_label}_{uuid.uuid4()}" # UUID untuk mencegah DuplicateWidgetID
+        unique_key = f"btn_{safe_label}_{uuid.uuid4()}"
         
         st.download_button(
             label=f"📥 Download Excel ({file_label})",
@@ -171,8 +166,9 @@ if file_sotk is not None:
 
         st.markdown("---")
 
-        # --- TABS ---
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        # --- TABS (TAMBAH TAB VISUALISASI) ---
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "📈 Visualisasi", # Tab Baru
             "🏢 Struktur SKPD", 
             "📂 Data Master", 
             "🔍 Cari ID", 
@@ -180,8 +176,60 @@ if file_sotk is not None:
             "✅ Validasi"
         ])
 
-        # === TAB 1: SKPD ===
+        # === TAB 1: VISUALISASI GRAFIK ===
         with tab1:
+            st.markdown("### 📈 Visualisasi Data SOTK")
+            
+            # 1. Sunburst Chart (Hierarki)
+            st.markdown("#### 1. Peta Hierarki Organisasi (Sunburst)")
+            st.caption("Klik pada bagian lingkaran untuk masuk ke detail (Zoom In). Klik tengah untuk kembali.")
+            
+            if 'Level 2' in df.columns and 'Level 3' in df.columns:
+                # Siapkan data untuk Sunburst
+                # Kita ganti '-' dengan 'Unspecified' agar chart tidak bolong, atau drop
+                df_chart = df.copy()
+                cols_sunburst = ['Level 2', 'Level 3', 'Level 4']
+                # Hanya ambil data yang level 2 nya ada
+                df_chart = df_chart[df_chart['Level 2'] != '-']
+                
+                # Plotly Sunburst
+                try:
+                    fig_sun = px.sunburst(
+                        df_chart, 
+                        path=cols_sunburst, 
+                        values='TOTAL KEBUTUHAN',
+                        color='Level 2', # Warna beda tiap Dinas
+                        title="Distribusi Kebutuhan Pegawai per Hierarki",
+                        height=600
+                    )
+                    st.plotly_chart(fig_sun, use_container_width=True)
+                except Exception as e:
+                    st.warning(f"Data belum cukup kompleks untuk Sunburst chart: {e}")
+            
+            st.divider()
+
+            # 2. Bar Chart Top SKPD
+            st.markdown("#### 2. Top 10 SKPD dengan Kebutuhan Terbanyak")
+            
+            if 'Level 2' in df.columns:
+                skpd_stats = df[df['Level 2'] != '-'].groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
+                skpd_stats = skpd_stats.sort_values(by='TOTAL KEBUTUHAN', ascending=False).head(10)
+                
+                fig_bar = px.bar(
+                    skpd_stats,
+                    x='TOTAL KEBUTUHAN',
+                    y='Level 2',
+                    orientation='h',
+                    title="Top 10 SKPD (Total Kebutuhan)",
+                    text_auto=True,
+                    color='TOTAL KEBUTUHAN',
+                    color_continuous_scale='Viridis'
+                )
+                fig_bar.update_layout(yaxis=dict(autorange="reversed")) # Urutkan dari atas ke bawah
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+        # === TAB 2: SKPD ===
+        with tab2:
             if 'Level 2' in df.columns:
                 unique_skpd = sorted([x for x in df['Level 2'].unique() if x != '-'])
                 
@@ -218,8 +266,8 @@ if file_sotk is not None:
                                     st.metric(f"Total Kebutuhan: {pilihbidang}", int(tot_bid))
                                     tampilkan_dan_download(bidang_view, f"Detail_{pilihbidang}")
 
-        # === TAB 2: DATA MASTER ===
-        with tab2:
+        # === TAB 3: DATA MASTER ===
+        with tab3:
             st.markdown("### 📂 Data Master Keseluruhan")
             filter_nama = st.text_input("Cari nama unit kerja:", key="filter_master")
             
@@ -230,8 +278,8 @@ if file_sotk is not None:
             st.caption(f"Menampilkan {len(df_display)} baris data.")
             tampilkan_dan_download(df_display, "Master_Data_SOTK")
 
-        # === TAB 3: CARI ID ===
-        with tab3:
+        # === TAB 4: CARI ID ===
+        with tab4:
             cari_id = st.text_input("Masukkan ID Unor:")
             if cari_id:
                 res = df[df['ID'] == cari_id]
@@ -241,8 +289,8 @@ if file_sotk is not None:
                 else:
                     st.warning("ID Tidak Ditemukan")
 
-        # === TAB 4: CARI NAMA ===
-        with tab4:
+        # === TAB 5: CARI NAMA ===
+        with tab5:
             cari_nama_tab = st.text_input("Cari Nama Jabatan / Unit:")
             if cari_nama_tab:
                 res = df[df['NAMA UNOR'].str.contains(cari_nama_tab, case=False, na=False)]
@@ -254,8 +302,8 @@ if file_sotk is not None:
                 else:
                     st.warning("Tidak ditemukan")
 
-        # === TAB 5: VALIDASI (DETAIL DIKEMBALIKAN) ===
-        with tab5:
+        # === TAB 6: VALIDASI ===
+        with tab6:
             st.markdown("### 🔄 Validasi Data Listing")
             st.write("Upload File Listing untuk melihat rekapitulasi dan detail data per SKPD.")
             
@@ -276,7 +324,6 @@ if file_sotk is not None:
                     cols_to_merge = ['ID', 'Level 2', 'Level 3']
                     cols_to_merge = [c for c in cols_to_merge if c in df.columns]
                     
-                    # Merge data listing dengan data SOTK
                     df_merge = pd.merge(df_list, df[cols_to_merge], on='ID', how='left')
                     
                     # 1. Tampilkan Rekap
@@ -286,22 +333,19 @@ if file_sotk is not None:
                     
                     st.divider()
 
-                    # 2. FITUR DETAIL (Dikembalikan)
+                    # 2. FITUR DETAIL
                     st.markdown("#### 📂 Detail Data Listing per SKPD")
                     
-                    # Ambil daftar dinas yang valid
                     list_dinas = sorted([x for x in df_merge['Level 2'].unique() if pd.notna(x) and str(x) != '-' and str(x) != 'nan'])
                     
                     pilih_dinas_val = st.selectbox("Pilih Unit Organisasi (Listing):", list_dinas, index=None)
                     
                     if pilih_dinas_val:
-                        # Filter berdasarkan Dinas
                         detail_val = df_merge[df_merge['Level 2'] == pilih_dinas_val].copy()
                         
                         st.info(f"Menampilkan detail data untuk **{pilih_dinas_val}**")
                         tampilkan_dan_download(detail_val, f"Listing_{pilih_dinas_val}")
                         
-                        # Filter berdasarkan Bidang (Opsional)
                         if 'Level 3' in detail_val.columns:
                             list_bidang = sorted([x for x in detail_val['Level 3'].unique() if pd.notna(x) and str(x) != '-' and str(x) != 'nan'])
                             
