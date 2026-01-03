@@ -1,56 +1,73 @@
-# 📊 Data SOTK HSU (Hulu Sungai Utara)
+# Dashboard Analisis SOTK - Kabupaten Hulu Sungai Utara 📊
 
-Project ini berisi *tools* dan skrip Python untuk pengolahan, analisis, dan pemetaan data **SOTK (Susunan Organisasi dan Tata Kerja)** di lingkungan Pemerintah Kabupaten Hulu Sungai Utara.
+Aplikasi berbasis web untuk menganalisis, memvalidasi, dan memvisualisasikan data Susunan Organisasi dan Tata Kerja (SOTK) Pemerintah Kabupaten Hulu Sungai Utara. Dibangun menggunakan Python dan Streamlit.
 
-Project ini bertujuan untuk mempermudah manajemen data jabatan, unit kerja, dan struktur organisasi agar lebih terstruktur dan mudah dianalisis.
+## 🚀 Fitur Utama (Versi 3.0)
 
-## 🎯 Fungsi Utama
-
-* **Data Processing:** Membersihkan dan menstandarisasi data mentah SOTK.
-* **Analisis Jabatan:** (Opsional: sesuaikan dengan isi script) Membantu pemetaan Analisis Jabatan (Anjab) dan Analisis Beban Kerja (ABK).
-* **Reporting:** Menghasilkan output data yang siap digunakan untuk laporan atau integrasi aplikasi lain.
+* **Rekonstruksi Hierarki Otomatis:** Mengubah data *flat* (Excel/CSV) menjadi struktur hierarki Level 1 - Level 6 berdasarkan relasi *Parent-Child* (ID Atasan).
+* **Visualisasi Interaktif (Baru):**
+    * **Sunburst Chart:** Melihat peta organisasi secara menyeluruh dari Dinas hingga Seksi dalam bentuk diagram matahari.
+    * **Bar Charts:** Analisis Top 10 SKPD dengan kebutuhan pegawai terbesar dan distribusi unit per level.
+* **Validasi Data (Health Check):**
+    * Mendeteksi **"Data Yatim"** (Unit kerja yang memiliki ID Atasan, namun atasannya tidak ditemukan di database).
+    * Validasi *Cross-check* dengan file Listing Pegawai.
+* **Pencarian Canggih:** Mencari Unit Kerja berdasarkan ID atau Nama dengan kalkulasi total kebutuhan *real-time*.
+* **Export Laporan:** Download hasil analisis (Rekap SKPD, Detail Bidang, Hasil Pencarian) ke format Excel (`.xlsx`) yang rapi.
+* **Fleksibilitas Input:** Mendukung format file `.xlsx` dan `.csv` secara otomatis.
+* **Performa Tinggi:** Menggunakan sistem *caching* agar pemrosesan data instan tanpa loading berulang.
 
 ## 🛠️ Teknologi
 
-* **Language:** Python 3.x
-* **Data Manipulation:** Pandas (Asumsi, sesuaikan jika pakai library lain)
-* **Environment:** VS Code (DevContainer Support)
+* **Python 3.10+**
+* **Streamlit:** Framework Dashboard Modern.
+* **Pandas:** Pemrosesan & Manipulasi Data.
+* **Plotly:** Grafik Interaktif.
+* **OpenPyxl:** Manipulasi dan Export Excel.
 
-## 🚀 Cara Menjalankan
+## 📦 Cara Instalasi
 
-1.  **Clone Repository**
-    ~~~bash
+1.  **Clone repositori ini:**
+    ```bash
     git clone https://github.com/rezaldwntr/data-sotk-hsu.git
     cd data-sotk-hsu
-    ~~~
+    ```
 
-2.  **Setup Environment**
-    Disarankan menggunakan Virtual Environment agar library tidak bentrok.
-    ~~~bash
-    python -m venv venv
-    source venv/bin/activate  # Windows: venv\Scripts\activate
-    ~~~
+2.  **Buat Virtual Environment (Disarankan):**
+    * **Windows:**
+        ```bash
+        python -m venv venv
+        venv\Scripts\activate
+        ```
+    * **Mac/Linux:**
+        ```bash
+        python3 -m venv venv
+        source venv/bin/activate
+        ```
 
-3.  **Install Dependencies**
-    ~~~bash
+3.  **Install Dependensi:**
+    ```bash
     pip install -r requirements.txt
-    ~~~
+    ```
 
-4.  **Jalankan Skrip**
-    ~~~bash
-    python data_sotk_hsu.py
-    ~~~
+## ▶️ Cara Menjalankan Aplikasi
 
-## 📂 Struktur Project
+Jalankan perintah berikut di terminal:
 
-~~~text
-data-sotk-hsu/
-├── .devcontainer/    # Konfigurasi environment VS Code
-├── data/             # Folder untuk menyimpan file raw/output (Ignored by Git)
-├── data_sotk_hsu.py  # Skrip utama
-├── requirements.txt  # Daftar library yang dibutuhkan
-└── README.md         # Dokumentasi project
-~~~
+```bash
+streamlit run data_sotk_hsu.py
+```
+
+Aplikasi akan terbuka otomatis di browser Anda (biasanya di `http://localhost:8501`).
+
+## 📝 Catatan Rilis (Changelog)
+
+**Versi 3.0.0 - Major Update: Visualization & Robustness**
+* **[ADD]** Tab Visualisasi (Sunburst & Bar Chart) menggunakan Plotly.
+* **[FIX]** Algoritma pembacaan hierarki diubah total menjadi *Recursive Lineage* (lebih akurat & mendukung format ID dinamis).
+* **[ADD]** Fitur *Caching* (`@st.cache_data`) untuk performa loading data yang jauh lebih cepat.
+* **[ADD]** Deteksi Data Error (Orphan Data/Data Yatim) di Sidebar.
+* **[FIX]** Perbaikan tombol Download Excel yang sebelumnya error (`StreamlitInvalidHeightError` & `DuplicateWidgetID`).
+* **[FIX]** Mendukung upload file `.csv` sebagai fallback otomatis jika `.xlsx` gagal dibaca.
 
 ---
-© 2025 Rezal Dewantara.
+Developed by **Rezal Dewantara**
