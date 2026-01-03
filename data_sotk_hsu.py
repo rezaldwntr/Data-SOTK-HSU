@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
+import io  # Tambahan untuk fitur download
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(
@@ -26,14 +27,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SIDEBAR ---
-with st.sidebar:
-    st.header("📂 Panel Kontrol")
-    file_sotk = st.file_uploader("Upload File SOTK (.xlsx)", type=['xlsx', 'xls'])
-    st.divider()
-    st.caption("Developed by Rezal Dewantara")
+# --- 2. LOGIKA UTAMA & SIDEBAR ---
+# Kita pindahkan sidebar ke dalam flow agar variabel df bisa diakses untuk tombol download
 
-# --- 3. LOGIKA UTAMA ---
+st.sidebar.header("📂 Panel Kontrol")
+file_sotk = st.sidebar.file_uploader("Upload File SOTK (.xlsx)", type=['xlsx', 'xls'])
+st.sidebar.caption("Developed by Rezal Dewantara")
+
 st.title("📊 Dashboard Analisis SOTK")
 st.subheader("Pemerintah Kabupaten Hulu Sungai Utara")
 st.markdown("---")
@@ -46,8 +46,8 @@ if file_sotk is not None:
         st.error(f"Gagal membaca file: {e}")
         st.stop()
 
-    # --- ALGORITMA BARU: REKONSTRUKSI HIERARKI (PARENT-CHILD TRACING) ---
-    with st.spinner('Sedang merekonstruksi struktur organisasi...'):
+    # --- ALGORITMA: REKONSTRUKSI HIERARKI (PARENT-CHILD TRACING) ---
+    with st.spinner('Sedang memproses struktur organisasi...'):
         
         # 1. Pre-processing standar
         if 'TOTAL KEBUTUHAN' in df.columns:
@@ -56,65 +56,64 @@ if file_sotk is not None:
         # Bersihkan string nama
         df['NAMA UNOR'] = df['NAMA UNOR'].astype(str).str.lstrip('-')
         
-        # 2. Buat Dictionary untuk Lookup Cepat (Sangat Cepat & Efisien)
-        #    Map: ID -> DIATASAN ID (Untuk mencari bapaknya siapa)
+        # 2. Buat Dictionary untuk Lookup Cepat
         parent_map = df.set_index('ID')['DIATASAN ID'].to_dict()
-        #    Map: ID -> NAMA UNOR (Untuk memberi nama nanti)
         name_map = df.set_index('ID')['NAMA UNOR'].to_dict()
 
         # 3. Fungsi Penelusuran Jalur (Path Finding)
-        #    Fungsi ini melacak dari Unit terbawah naik ke atas sampai mentok (Root)
         def get_lineage(node_id):
             path = []
             curr = node_id
-            
-            # Loop naik ke atas (maksimal kedalaman 10 untuk mencegah infinite loop)
-            for _ in range(10):
+            for _ in range(10): # Max kedalaman 10
                 if pd.isna(curr) or curr not in name_map:
                     break
-                
-                path.append(curr) # Simpan ID saat ini
-                
-                # Cari ID Bapaknya
+                path.append(curr)
                 parent = parent_map.get(curr)
-                
-                # Jika Bapaknya kosong atau sama dengan diri sendiri (root), berhenti
                 if pd.isna(parent) or parent == curr:
                     break
                 curr = parent
-            
-            # Karena urutannya [Anak, Bapak, Kakek], kita balik jadi [Kakek, Bapak, Anak]
-            return path[::-1]
+            return path[::-1] # Balik urutan: Kakek -> Bapak -> Anak
 
         # 4. Terapkan ke semua baris
-        #    Hasilnya adalah list ID hierarki [Level 1 ID, Level 2 ID, dst]
         df['hierarchy_path'] = df['ID'].apply(get_lineage)
 
         # 5. Pecah List menjadi Kolom Level 1 - Level 6
         hierarchy_df = pd.DataFrame(df['hierarchy_path'].tolist(), index=df.index)
-        #    Ambil maksimal 6 kolom
-        hierarchy_df = hierarchy_df.iloc[:, :6]
-        #    Beri nama kolom
+        hierarchy_df = hierarchy_df.iloc[:, :6] # Ambil max 6 level
         hierarchy_df.columns = [f'Level {i+1}' for i in range(hierarchy_df.shape[1])]
         
-        #    Gabungkan kembali ke DF utama
         df = pd.concat([df, hierarchy_df], axis=1)
 
         # 6. Ubah ID menjadi Nama Unor (Mapping)
         level_cols = [c for c in df.columns if c.startswith('Level ')]
         for col in level_cols:
-            # Map ID ke Nama, jika NaN isi dengan strip
             df[col] = df[col].map(name_map).fillna('-')
 
     # --- PEMBERSIHAN DATA LANJUTAN ---
-    # Tambah kolom Nama Atasan Langsung untuk info tambahan
     df['NAMA ATASAN'] = df['DIATASAN ID'].map(name_map).fillna('-')
     
-    # Hapus kolom teknis yang tidak perlu ditampilkan
+    # Hapus kolom teknis
     drop_cols = ['DIATASAN ID', 'ROOT ID', 'ROW LEVEL', 'URUTAN', 'AKTIF', 'CORDER', 'INDUK UNOR ID', 'hierarchy_path']
     df = df.drop(columns=[c for c in drop_cols if c in df.columns])
 
-    # --- 4. DASHBOARD UI (Sama seperti sebelumnya) ---
+    # --- FITUR BARU 1: DOWNLOAD BUTTON DI SIDEBAR ---
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📥 Download Data")
+    
+    # Simpan DF ke buffer Excel
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='SOTK_Processed')
+    
+    st.sidebar.download_button(
+        label="Download Excel Hasil Olahan",
+        data=buffer.getvalue(),
+        file_name="SOTK_HSU_Processed.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        help="Download data lengkap termasuk kolom Level hierarki yang sudah dibuat."
+    )
+
+    # --- DASHBOARD UI ---
     
     # Global Stats
     c1, c2, c3 = st.columns(3)
@@ -127,15 +126,19 @@ if file_sotk is not None:
 
     st.markdown("---")
 
-    # Tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["🏢 Struktur SKPD", "🔍 Cari ID", "🔎 Cari Nama", "✅ Validasi"])
+    # Tabs (Update: Tambah Tab 'Data Master')
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "🏢 Struktur SKPD", 
+        "📂 Data Master", 
+        "🔍 Cari ID", 
+        "🔎 Cari Nama", 
+        "✅ Validasi"
+    ])
 
     # === TAB 1: SKPD ===
     with tab1:
         if 'Level 2' in df.columns:
-            # Dropdown Level 2 (Dinas)
             unique_skpd = df['Level 2'].unique()
-            # Hapus yang kosong/-
             unique_skpd = [x for x in unique_skpd if x != '-']
             unique_skpd.sort()
             
@@ -153,11 +156,12 @@ if file_sotk is not None:
                     m1, m2 = st.columns(2)
                     m1.metric(f"Kebutuhan {pilihdinas}", f"{int(filtered_df['TOTAL KEBUTUHAN'].sum())}")
                     if 'Level 3' in filtered_df.columns:
-                        m2.metric("Jumlah Bidang", f"{filtered_df['Level 3'].nunique()}")
+                        m2.metric("Jumlah Bidang/Bagian", f"{filtered_df['Level 3'].nunique()}")
 
                     # Tabel Agregasi
                     agg_cols = [c for c in ['Level 3', 'Level 4', 'Level 5', 'Level 6'] if c in filtered_df.columns]
                     if agg_cols:
+                        st.caption("Tabel Rekapitulasi Struktur:")
                         view_df = filtered_df.groupby(agg_cols)['TOTAL KEBUTUHAN'].sum().reset_index()
                         st.dataframe(view_df, use_container_width=True, hide_index=True)
                         
@@ -169,12 +173,35 @@ if file_sotk is not None:
                             unique_bidang = [x for x in unique_bidang if x != '-']
                             
                             pilihbidang = st.selectbox("Filter Bidang (Level 3)", unique_bidang, index=None)
+                            
                             if pilihbidang:
                                 bidang_view = view_df[view_df['Level 3'] == pilihbidang]
+                                
+                                # --- FITUR BARU 3: TOTAL KEBUTUHAN PER BIDANG ---
+                                total_keb_bidang = bidang_view['TOTAL KEBUTUHAN'].sum()
+                                st.metric(label=f"Total Kebutuhan: {pilihbidang}", value=int(total_keb_bidang))
+                                # ------------------------------------------------
+                                
                                 st.dataframe(bidang_view, use_container_width=True)
 
-    # === TAB 2: Cari ID ===
+    # === TAB 2: DATA MASTER (FITUR BARU 2) ===
     with tab2:
+        st.markdown("### 📂 Data Keseluruhan")
+        st.write("Tabel ini menampilkan seluruh data yang telah diproses.")
+        
+        # Opsi filter sederhana di tab master
+        with st.expander("Filter Cepat Data Master"):
+            filter_nama = st.text_input("Filter berdasarkan Nama Unor:", key="filter_master")
+        
+        df_display = df.copy()
+        if filter_nama:
+            df_display = df_display[df_display['NAMA UNOR'].str.contains(filter_nama, case=False, na=False)]
+            
+        st.dataframe(df_display, use_container_width=True)
+        st.caption(f"Menampilkan {len(df_display)} baris data.")
+
+    # === TAB 3: Cari ID ===
+    with tab3:
         cari_id = st.text_input("Masukkan ID Unor")
         if cari_id:
             res = df[df['ID'] == cari_id]
@@ -184,8 +211,8 @@ if file_sotk is not None:
             else:
                 st.warning("ID Tidak Ditemukan")
 
-    # === TAB 3: Cari Nama ===
-    with tab3:
+    # === TAB 4: Cari Nama ===
+    with tab4:
         cari_nama = st.text_input("Cari Nama Jabatan")
         if cari_nama:
             res = df[df['NAMA UNOR'].str.contains(cari_nama, case=False, na=False)]
@@ -196,17 +223,15 @@ if file_sotk is not None:
             else:
                 st.warning("Tidak ditemukan")
 
-    # === TAB 4: Validasi ===
-    with tab4:
+    # === TAB 5: Validasi ===
+    with tab5:
         st.write("Upload File Listing untuk membandingkan.")
         file_list = st.file_uploader("Upload File Listing (.xlsx)", key='list_up')
         
         if file_list and 'Level 2' in df.columns:
             try:
                 df_list = pd.read_excel(file_list)
-                # Ambil kolom level hasil olahan tadi
                 cols_to_merge = ['ID', 'Level 2', 'Level 3']
-                # Hanya ambil yg ada di df
                 cols_to_merge = [c for c in cols_to_merge if c in df.columns]
                 
                 df_merge = pd.merge(df_list, df[cols_to_merge], on='ID', how='left')
@@ -218,4 +243,4 @@ if file_sotk is not None:
                 st.error(f"Error proses listing: {e}")
 
 else:
-    st.info("👋 Silakan upload file SOTK di panel sebelah kiri.")
+    st.info("👋 Silakan upload file SOTK di panel sebelah kiri untuk memulai.")
