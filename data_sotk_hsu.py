@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-# --- 1. KONFIGURASI HALAMAN (MODERN UI) ---
+# --- 1. KONFIGURASI HALAMAN (MODERN UI & DARK MODE FRIENDLY) ---
 st.set_page_config(
     page_title="Dashboard SOTK HSU",
     page_icon="📊",
@@ -10,15 +10,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS untuk tampilan lebih rapi
+# --- PERBAIKAN CSS DI SINI ---
+# Saya menghapus background-color putih keras dan menggantinya dengan rgba
+# agar mengikuti tema (Dark/Light) otomatis.
 st.markdown("""
 <style>
     .block-container {padding-top: 2rem;}
+    
+    /* Styling Kartu Metric agar transparan/gelap sesuai tema */
     div[data-testid="stMetric"] {
-        background-color: #f8f9fa;
+        background-color: rgba(255, 255, 255, 0.05); /* Transparan halus */
         padding: 15px;
         border-radius: 10px;
-        border: 1px solid #dee2e6;
+        border: 1px solid rgba(255, 255, 255, 0.1); /* Border halus */
+    }
+    
+    /* Hapus background putih jika ada elemen lain yang conflict */
+    div[data-testid="stMetricValue"] {
+        color: inherit !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -47,7 +56,7 @@ if file_sotk is not None:
         st.error(f"Gagal membaca file: {e}")
         st.stop()
 
-    # --- DATA PROCESSING (Logika Perbaikan Sebelumnya) ---
+    # --- DATA PROCESSING ---
     if 'TOTAL KEBUTUHAN' in df.columns:
         df['TOTAL KEBUTUHAN'] = pd.to_numeric(df['TOTAL KEBUTUHAN'], errors='coerce').fillna(0)
 
