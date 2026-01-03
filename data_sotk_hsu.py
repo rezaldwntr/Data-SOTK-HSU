@@ -4,7 +4,7 @@ import streamlit as st
 import io
 import re
 import uuid
-import plotly.express as px  # Library Chart Modern
+import plotly.express as px
 
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(
@@ -36,6 +36,7 @@ st.markdown("""
 
 # --- 2. FUNGSI BANTUAN ---
 def sanitize_filename(name):
+    """Membersihkan string agar aman dijadikan nama file."""
     return re.sub(r'[\\/*?:"<>|]', "_", str(name)).strip()
 
 def tampilkan_dan_download(df_input, file_label, height=None):
@@ -166,9 +167,9 @@ if file_sotk is not None:
 
         st.markdown("---")
 
-        # --- TABS (TAMBAH TAB VISUALISASI) ---
+        # --- TABS ---
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-            "📈 Visualisasi", # Tab Baru
+            "📈 Visualisasi", 
             "🏢 Struktur SKPD", 
             "📂 Data Master", 
             "🔍 Cari ID", 
@@ -180,38 +181,29 @@ if file_sotk is not None:
         with tab1:
             st.markdown("### 📈 Visualisasi Data SOTK")
             
-            # 1. Sunburst Chart (Hierarki)
-            st.markdown("#### 1. Peta Hierarki Organisasi (Sunburst)")
-            st.caption("Klik pada bagian lingkaran untuk masuk ke detail (Zoom In). Klik tengah untuk kembali.")
-            
             if 'Level 2' in df.columns and 'Level 3' in df.columns:
-                # Siapkan data untuk Sunburst
-                # Kita ganti '-' dengan 'Unspecified' agar chart tidak bolong, atau drop
                 df_chart = df.copy()
                 cols_sunburst = ['Level 2', 'Level 3', 'Level 4']
-                # Hanya ambil data yang level 2 nya ada
                 df_chart = df_chart[df_chart['Level 2'] != '-']
                 
-                # Plotly Sunburst
                 try:
+                    st.markdown("#### 1. Peta Hierarki Organisasi (Sunburst)")
+                    st.caption("Klik lingkaran untuk zoom in.")
                     fig_sun = px.sunburst(
                         df_chart, 
                         path=cols_sunburst, 
                         values='TOTAL KEBUTUHAN',
-                        color='Level 2', # Warna beda tiap Dinas
-                        title="Distribusi Kebutuhan Pegawai per Hierarki",
+                        color='Level 2', 
                         height=600
                     )
                     st.plotly_chart(fig_sun, use_container_width=True)
                 except Exception as e:
-                    st.warning(f"Data belum cukup kompleks untuk Sunburst chart: {e}")
+                    st.warning(f"Belum cukup data untuk Sunburst chart: {e}")
             
             st.divider()
 
-            # 2. Bar Chart Top SKPD
-            st.markdown("#### 2. Top 10 SKPD dengan Kebutuhan Terbanyak")
-            
             if 'Level 2' in df.columns:
+                st.markdown("#### 2. Top 10 SKPD dengan Kebutuhan Terbanyak")
                 skpd_stats = df[df['Level 2'] != '-'].groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
                 skpd_stats = skpd_stats.sort_values(by='TOTAL KEBUTUHAN', ascending=False).head(10)
                 
@@ -220,12 +212,11 @@ if file_sotk is not None:
                     x='TOTAL KEBUTUHAN',
                     y='Level 2',
                     orientation='h',
-                    title="Top 10 SKPD (Total Kebutuhan)",
                     text_auto=True,
                     color='TOTAL KEBUTUHAN',
                     color_continuous_scale='Viridis'
                 )
-                fig_bar.update_layout(yaxis=dict(autorange="reversed")) # Urutkan dari atas ke bawah
+                fig_bar.update_layout(yaxis=dict(autorange="reversed"))
                 st.plotly_chart(fig_bar, use_container_width=True)
 
         # === TAB 2: SKPD ===
@@ -296,6 +287,12 @@ if file_sotk is not None:
                 res = df[df['NAMA UNOR'].str.contains(cari_nama_tab, case=False, na=False)]
                 if not res.empty:
                     st.info(f"Ditemukan {len(res)} data")
+                    
+                    # --- FITUR BARU: TOTAL KEBUTUHAN PENCARIAN ---
+                    total_keb_cari = res['TOTAL KEBUTUHAN'].sum()
+                    st.metric("Total Kebutuhan (Hasil Pencarian)", int(total_keb_cari))
+                    # ---------------------------------------------
+                    
                     cols_show = ['NAMA UNOR'] + [c for c in df.columns if c.startswith('Level ')] + ['TOTAL KEBUTUHAN']
                     cols_show = [c for c in cols_show if c in res.columns]
                     tampilkan_dan_download(res[cols_show], f"Search_Nama_{cari_nama_tab}")
@@ -329,6 +326,22 @@ if file_sotk is not None:
                     # 1. Tampilkan Rekap
                     grp = df_merge.groupby('Level 2').size().reset_index(name='Jumlah')
                     st.markdown("#### 📊 Rekapitulasi Jumlah Pegawai per SKPD (Listing)")
+                    
+                    # --- FITUR BARU: CHART VALIDASI ---
+                    if not grp.empty:
+                        grp_sorted = grp.sort_values(by='Jumlah', ascending=True)
+                        fig_val = px.bar(
+                            grp_sorted,
+                            x='Jumlah',
+                            y='Level 2',
+                            orientation='h',
+                            title="Distribusi Data Listing per SKPD",
+                            text_auto=True,
+                            height=600 if len(grp) > 10 else 400
+                        )
+                        st.plotly_chart(fig_val, use_container_width=True)
+                    # ----------------------------------
+
                     tampilkan_dan_download(grp, "Rekap_Validasi_Listing")
                     
                     st.divider()
