@@ -15,9 +15,10 @@ st.set_page_config(
     menu_items={
         'Get Help': 'https://www.linkedin.com/in/rezaldwntr/',
         'About': """
-        ### Dashboard Analisis SOTK HSU v3.6
+        ### Dashboard Analisis SOTK HSU v3.7
         **Fitur Baru:**
-        - Full Interaktif: Klik SEMUA grafik (SKPD, Jabatan, Sektoral) untuk lihat detail.
+        - Sunburst Chart (Diagram Matahari) kembali hadir di posisi teratas.
+        - Full Interaktif untuk semua grafik.
         """
     }
 )
@@ -207,8 +208,36 @@ if file_sotk is not None:
     with tab1:
         st.markdown("### 📈 Statistik & Visualisasi")
 
-        # 1. Top 10 SKPD (INTERAKTIF)
-        st.markdown("#### 1. Top 10 SKPD (Kebutuhan Pegawai)")
+        # --- 1. SUNBURST CHART (PALING ATAS) ---
+        st.markdown("#### 1. Peta Hierarki Organisasi (Sunburst)")
+        st.caption("👇 **Klik lingkaran dalam** untuk masuk (zoom in) ke Dinas/Bidang. **Klik lingkaran tengah** untuk kembali (zoom out).")
+        
+        if 'Level 2' in df.columns and 'Level 3' in df.columns:
+            # Filter data valid untuk sunburst (Level 2 tidak boleh kosong/-)
+            df_sun = df[
+                (df['Level 2'] != '-') & 
+                (df['Level 2'].notna())
+            ].copy()
+
+            try:
+                fig_sun = px.sunburst(
+                    df_sun, 
+                    path=['Level 2', 'Level 3', 'Level 4'], 
+                    values='TOTAL KEBUTUHAN',
+                    color='Level 2', 
+                    height=700,
+                    title="Proporsi Kebutuhan Pegawai per Hierarki (Dinas > Bidang > Seksi)"
+                )
+                st.plotly_chart(fig_sun, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Data belum cukup untuk menampilkan Sunburst Chart: {e}")
+        else:
+            st.warning("Kolom Level 2 atau Level 3 tidak ditemukan untuk membuat Sunburst Chart.")
+        
+        st.divider()
+
+        # --- 2. TOP 10 SKPD ---
+        st.markdown("#### 2. Top 10 SKPD (Kebutuhan Pegawai)")
         st.caption("👇 Klik batang grafik untuk melihat detail unit kerja di SKPD tersebut.")
         
         if 'Level 2' in df.columns:
@@ -227,7 +256,6 @@ if file_sotk is not None:
             
             selected_skpd = None
             if event_skpd and len(event_skpd['selection']['points']) > 0:
-                # Grafik Horizontal, nama ada di sumbu Y
                 selected_skpd = event_skpd['selection']['points'][0]['y']
             
             if selected_skpd:
@@ -237,8 +265,8 @@ if file_sotk is not None:
 
         st.divider()
 
-        # 2. Distribusi Jabatan (INTERAKTIF)
-        st.markdown("#### 2. Distribusi Jabatan")
+        # --- 3. DISTRIBUSI JABATAN ---
+        st.markdown("#### 3. Distribusi Jabatan")
         st.caption("👇 Klik batang grafik untuk melihat daftar pegawai/jabatan.")
         
         if 'ESELON' in df.columns and 'JENIS JABATAN' in df.columns:
@@ -298,12 +326,12 @@ if file_sotk is not None:
 
         st.divider()
 
-        # 3. Statistik Sektoral (INTERAKTIF)
-        st.markdown("#### 3. Statistik Sektoral (Unit Kerja)")
+        # --- 4. STATISTIK SEKTORAL ---
+        st.markdown("#### 4. Statistik Sektoral (Unit Kerja)")
         st.caption("👇 Klik batang grafik untuk melihat daftar unit kerja.")
         col_sec1, col_sec2 = st.columns(2)
 
-        # --- A. PENDIDIKAN ---
+        # A. PENDIDIKAN
         with col_sec1:
             st.markdown("**A. Pendidikan (Jumlah Sekolah)**")
             def cek_pendidikan(nama):
@@ -330,21 +358,18 @@ if file_sotk is not None:
                 
                 # Interactive Select
                 event_pend = st.plotly_chart(fig_pend, use_container_width=True, on_select="rerun")
-                
                 selected_pend = None
                 if event_pend and len(event_pend['selection']['points']) > 0:
-                    # Grafik Vertikal, Kategori ada di sumbu X
                     selected_pend = event_pend['selection']['points'][0]['x']
                 
                 if selected_pend:
                     st.info(f"📂 Detail Data: **{selected_pend}**")
                     detail_pend = df_pend[df_pend['KATEGORI'] == selected_pend].copy()
                     tampilkan_dan_download(detail_pend, f"Detail_{selected_pend}")
-
             else:
                 st.info("Tidak ditemukan data sekolah.")
 
-        # --- B. KESEHATAN ---
+        # B. KESEHATAN
         with col_sec2:
             st.markdown("**B. Kesehatan (Fasilitas)**")
             def cek_kesehatan(nama):
@@ -367,7 +392,6 @@ if file_sotk is not None:
                 
                 # Interactive Select
                 event_kes = st.plotly_chart(fig_kes, use_container_width=True, on_select="rerun")
-                
                 selected_kes = None
                 if event_kes and len(event_kes['selection']['points']) > 0:
                     selected_kes = event_kes['selection']['points'][0]['x']
