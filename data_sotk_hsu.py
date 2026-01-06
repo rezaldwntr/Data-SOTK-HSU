@@ -15,10 +15,9 @@ st.set_page_config(
     menu_items={
         'Get Help': 'https://www.linkedin.com/in/rezaldwntr/',
         'About': """
-        ### Dashboard Analisis SOTK HSU v3.5
+        ### Dashboard Analisis SOTK HSU v3.6
         **Fitur Baru:**
-        - Interaksi Grafik: Klik bar untuk lihat detail data.
-        - Re-ordering Layout Visualisasi.
+        - Full Interaktif: Klik SEMUA grafik (SKPD, Jabatan, Sektoral) untuk lihat detail.
         """
     }
 )
@@ -208,8 +207,10 @@ if file_sotk is not None:
     with tab1:
         st.markdown("### 📈 Statistik & Visualisasi")
 
-        # 1. Top 10 SKPD
+        # 1. Top 10 SKPD (INTERAKTIF)
         st.markdown("#### 1. Top 10 SKPD (Kebutuhan Pegawai)")
+        st.caption("👇 Klik batang grafik untuk melihat detail unit kerja di SKPD tersebut.")
+        
         if 'Level 2' in df.columns:
             skpd_df = df[df['Level 2'].isin(valid_skpd)]
             skpd_stats = skpd_df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
@@ -220,13 +221,25 @@ if file_sotk is not None:
                 text_auto=True, color='TOTAL KEBUTUHAN', color_continuous_scale='Viridis', height=400
             )
             fig_bar.update_layout(yaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_bar, use_container_width=True)
+            
+            # Interactive Select
+            event_skpd = st.plotly_chart(fig_bar, use_container_width=True, on_select="rerun")
+            
+            selected_skpd = None
+            if event_skpd and len(event_skpd['selection']['points']) > 0:
+                # Grafik Horizontal, nama ada di sumbu Y
+                selected_skpd = event_skpd['selection']['points'][0]['y']
+            
+            if selected_skpd:
+                st.info(f"📂 Detail Data: **{selected_skpd}**")
+                detail_skpd = df[df['Level 2'] == selected_skpd].copy()
+                tampilkan_dan_download(detail_skpd, f"Detail_{selected_skpd}")
 
         st.divider()
 
-        # 2. Distribusi Jabatan (DIPINDAHKAN KE POSISI 2 & INTERAKTIF)
+        # 2. Distribusi Jabatan (INTERAKTIF)
         st.markdown("#### 2. Distribusi Jabatan")
-        st.caption("👇 **Klik pada salah satu batang diagram di bawah ini** untuk melihat detail data jabatan.")
+        st.caption("👇 Klik batang grafik untuk melihat daftar pegawai/jabatan.")
         
         if 'ESELON' in df.columns and 'JENIS JABATAN' in df.columns:
             def klasifikasi_jabatan_smart(row):
@@ -267,24 +280,17 @@ if file_sotk is not None:
                 )
                 fig_jab.update_layout(showlegend=False, yaxis=dict(autorange="reversed"))
                 
-                # --- INTERAKSI KLIK ---
-                # Menggunakan on_select='rerun' untuk menangkap klik user
-                event = st.plotly_chart(fig_jab, use_container_width=True, on_select="rerun")
+                # Interactive Select
+                event_jab = st.plotly_chart(fig_jab, use_container_width=True, on_select="rerun")
                 
-                # Cek apakah ada yang diklik
                 selected_jabatan = None
-                if event and len(event['selection']['points']) > 0:
-                    # Ambil label y (kategori jabatan) dari poin yang diklik
-                    selected_jabatan = event['selection']['points'][0]['y']
+                if event_jab and len(event_jab['selection']['points']) > 0:
+                    selected_jabatan = event_jab['selection']['points'][0]['y']
                 
                 if selected_jabatan:
-                    st.info(f"📂 Menampilkan Detail Data: **{selected_jabatan}**")
-                    detail_data = df_viz[df_viz['KELOMPOK_JABATAN'] == selected_jabatan].copy()
-                    
-                    # Tampilkan data dengan tombol download
-                    tampilkan_dan_download(detail_data, f"Detail_{selected_jabatan}")
-                else:
-                    st.caption("💡 *Tips: Klik batang grafik di atas untuk melihat siapa saja pegawai/jabatan di dalamnya.*")
+                    st.info(f"📂 Detail Data: **{selected_jabatan}**")
+                    detail_jab = df_viz[df_viz['KELOMPOK_JABATAN'] == selected_jabatan].copy()
+                    tampilkan_dan_download(detail_jab, f"Detail_{selected_jabatan}")
             else:
                 st.warning("Tidak ada data jabatan yang sesuai kriteria.")
         else:
@@ -292,10 +298,12 @@ if file_sotk is not None:
 
         st.divider()
 
-        # 3. Statistik Sektoral (Posisi Turun ke 3)
+        # 3. Statistik Sektoral (INTERAKTIF)
         st.markdown("#### 3. Statistik Sektoral (Unit Kerja)")
+        st.caption("👇 Klik batang grafik untuk melihat daftar unit kerja.")
         col_sec1, col_sec2 = st.columns(2)
 
+        # --- A. PENDIDIKAN ---
         with col_sec1:
             st.markdown("**A. Pendidikan (Jumlah Sekolah)**")
             def cek_pendidikan(nama):
@@ -319,10 +327,24 @@ if file_sotk is not None:
                     stats_pend, x='KATEGORI', y='Jumlah Unit', text_auto=True,
                     color='KATEGORI', title="Jumlah Sekolah"
                 )
-                st.plotly_chart(fig_pend, use_container_width=True)
+                
+                # Interactive Select
+                event_pend = st.plotly_chart(fig_pend, use_container_width=True, on_select="rerun")
+                
+                selected_pend = None
+                if event_pend and len(event_pend['selection']['points']) > 0:
+                    # Grafik Vertikal, Kategori ada di sumbu X
+                    selected_pend = event_pend['selection']['points'][0]['x']
+                
+                if selected_pend:
+                    st.info(f"📂 Detail Data: **{selected_pend}**")
+                    detail_pend = df_pend[df_pend['KATEGORI'] == selected_pend].copy()
+                    tampilkan_dan_download(detail_pend, f"Detail_{selected_pend}")
+
             else:
                 st.info("Tidak ditemukan data sekolah.")
 
+        # --- B. KESEHATAN ---
         with col_sec2:
             st.markdown("**B. Kesehatan (Fasilitas)**")
             def cek_kesehatan(nama):
@@ -342,7 +364,18 @@ if file_sotk is not None:
                     stats_kes, x='KATEGORI', y='Jumlah Unit', text_auto=True,
                     color='KATEGORI', title="Fasilitas Kesehatan"
                 )
-                st.plotly_chart(fig_kes, use_container_width=True)
+                
+                # Interactive Select
+                event_kes = st.plotly_chart(fig_kes, use_container_width=True, on_select="rerun")
+                
+                selected_kes = None
+                if event_kes and len(event_kes['selection']['points']) > 0:
+                    selected_kes = event_kes['selection']['points'][0]['x']
+                
+                if selected_kes:
+                    st.info(f"📂 Detail Data: **{selected_kes}**")
+                    detail_kes = df_kes[df_kes['KATEGORI'] == selected_kes].copy()
+                    tampilkan_dan_download(detail_kes, f"Detail_{selected_kes}")
             else:
                 st.info("Tidak ditemukan data kesehatan.")
 
