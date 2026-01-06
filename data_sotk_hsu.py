@@ -15,10 +15,9 @@ st.set_page_config(
     menu_items={
         'Get Help': 'https://www.linkedin.com/in/rezaldwntr/',
         'About': """
-        ### Dashboard Analisis SOTK HSU v3.7
+        ### Dashboard Analisis SOTK HSU v3.8
         **Fitur Baru:**
-        - Sunburst Chart (Diagram Matahari) kembali hadir di posisi teratas.
-        - Full Interaktif untuk semua grafik.
+        - Perbaikan Visual Grafik: Posisi teks angka diseragamkan (selalu di luar batang).
         """
     }
 )
@@ -208,37 +207,29 @@ if file_sotk is not None:
     with tab1:
         st.markdown("### 📈 Statistik & Visualisasi")
 
-        # --- 1. SUNBURST CHART (PALING ATAS) ---
+        # --- 1. SUNBURST CHART ---
         st.markdown("#### 1. Peta Hierarki Organisasi (Sunburst)")
-        st.caption("👇 **Klik lingkaran dalam** untuk masuk (zoom in) ke Dinas/Bidang. **Klik lingkaran tengah** untuk kembali (zoom out).")
+        st.caption("👇 Klik lingkaran dalam untuk zoom in.")
         
         if 'Level 2' in df.columns and 'Level 3' in df.columns:
-            # Filter data valid untuk sunburst (Level 2 tidak boleh kosong/-)
-            df_sun = df[
-                (df['Level 2'] != '-') & 
-                (df['Level 2'].notna())
-            ].copy()
-
+            df_sun = df[(df['Level 2'] != '-') & (df['Level 2'].notna())].copy()
             try:
                 fig_sun = px.sunburst(
                     df_sun, 
                     path=['Level 2', 'Level 3', 'Level 4'], 
                     values='TOTAL KEBUTUHAN',
                     color='Level 2', 
-                    height=700,
-                    title="Proporsi Kebutuhan Pegawai per Hierarki (Dinas > Bidang > Seksi)"
+                    height=700
                 )
                 st.plotly_chart(fig_sun, use_container_width=True)
             except Exception as e:
-                st.warning(f"Data belum cukup untuk menampilkan Sunburst Chart: {e}")
-        else:
-            st.warning("Kolom Level 2 atau Level 3 tidak ditemukan untuk membuat Sunburst Chart.")
+                st.warning(f"Data belum cukup untuk Sunburst: {e}")
         
         st.divider()
 
         # --- 2. TOP 10 SKPD ---
         st.markdown("#### 2. Top 10 SKPD (Kebutuhan Pegawai)")
-        st.caption("👇 Klik batang grafik untuk melihat detail unit kerja di SKPD tersebut.")
+        st.caption("👇 Klik batang grafik untuk melihat detail.")
         
         if 'Level 2' in df.columns:
             skpd_df = df[df['Level 2'].isin(valid_skpd)]
@@ -247,11 +238,15 @@ if file_sotk is not None:
             
             fig_bar = px.bar(
                 skpd_stats, x='TOTAL KEBUTUHAN', y='Level 2', orientation='h',
-                text_auto=True, color='TOTAL KEBUTUHAN', color_continuous_scale='Viridis', height=400
+                text='TOTAL KEBUTUHAN', # Explicit text
+                color='TOTAL KEBUTUHAN', color_continuous_scale='Viridis', height=400
             )
-            fig_bar.update_layout(yaxis=dict(autorange="reversed"))
             
-            # Interactive Select
+            # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
+            fig_bar.update_traces(textposition='outside')
+            fig_bar.update_layout(yaxis=dict(autorange="reversed"), margin=dict(r=50)) # Extra margin for text
+            # ------------------------------------------------
+
             event_skpd = st.plotly_chart(fig_bar, use_container_width=True, on_select="rerun")
             
             selected_skpd = None
@@ -267,7 +262,7 @@ if file_sotk is not None:
 
         # --- 3. DISTRIBUSI JABATAN ---
         st.markdown("#### 3. Distribusi Jabatan")
-        st.caption("👇 Klik batang grafik untuk melihat daftar pegawai/jabatan.")
+        st.caption("👇 Klik batang grafik untuk melihat detail.")
         
         if 'ESELON' in df.columns and 'JENIS JABATAN' in df.columns:
             def klasifikasi_jabatan_smart(row):
@@ -281,7 +276,6 @@ if file_sotk is not None:
                     return 'JABATAN ADMINISTRATOR (Eselon III)'
                 elif ('IV' in eselon) or (eselon in ['41', '42']) or ('PENGAWAS' in jenjang):
                     return 'JABATAN PENGAWAS (Eselon IV)'
-                
                 if 'PELAKSANA' in jenis or 'PELAKSANA' in jenjang or 'FUNGSIONAL UMUM' in jenis:
                     return 'JABATAN PELAKSANA'
                 if 'FUNGSIONAL' in jenis or 'FUNGSIONAL' in jenjang:
@@ -303,12 +297,15 @@ if file_sotk is not None:
             if not jabatan_stats.empty:
                 fig_jab = px.bar(
                     jabatan_stats, x='Jumlah', y='KELOMPOK_JABATAN', orientation='h',
-                    text_auto=True, title="Jumlah Pegawai per Kelompok Jabatan",
+                    text='Jumlah', # Explicit text
                     color='KELOMPOK_JABATAN', height=500
                 )
-                fig_jab.update_layout(showlegend=False, yaxis=dict(autorange="reversed"))
                 
-                # Interactive Select
+                # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
+                fig_jab.update_traces(textposition='outside')
+                fig_jab.update_layout(showlegend=False, yaxis=dict(autorange="reversed"), margin=dict(r=50))
+                # ------------------------------------------------
+                
                 event_jab = st.plotly_chart(fig_jab, use_container_width=True, on_select="rerun")
                 
                 selected_jabatan = None
@@ -352,11 +349,13 @@ if file_sotk is not None:
                 stats_pend = stats_pend.sort_values('KATEGORI')
 
                 fig_pend = px.bar(
-                    stats_pend, x='KATEGORI', y='Jumlah Unit', text_auto=True,
+                    stats_pend, x='KATEGORI', y='Jumlah Unit', text='Jumlah Unit',
                     color='KATEGORI', title="Jumlah Sekolah"
                 )
+                # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
+                fig_pend.update_traces(textposition='outside')
+                # ------------------------------------------------
                 
-                # Interactive Select
                 event_pend = st.plotly_chart(fig_pend, use_container_width=True, on_select="rerun")
                 selected_pend = None
                 if event_pend and len(event_pend['selection']['points']) > 0:
@@ -386,11 +385,13 @@ if file_sotk is not None:
             if not df_kes.empty:
                 stats_kes = df_kes.groupby('KATEGORI').size().reset_index(name='Jumlah Unit')
                 fig_kes = px.bar(
-                    stats_kes, x='KATEGORI', y='Jumlah Unit', text_auto=True,
+                    stats_kes, x='KATEGORI', y='Jumlah Unit', text='Jumlah Unit',
                     color='KATEGORI', title="Fasilitas Kesehatan"
                 )
-                
-                # Interactive Select
+                # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
+                fig_kes.update_traces(textposition='outside')
+                # ------------------------------------------------
+
                 event_kes = st.plotly_chart(fig_kes, use_container_width=True, on_select="rerun")
                 selected_kes = None
                 if event_kes and len(event_kes['selection']['points']) > 0:
@@ -497,7 +498,15 @@ if file_sotk is not None:
                 st.markdown("#### 📊 Rekapitulasi Validasi")
                 if not grp.empty:
                     grp_sorted = grp.sort_values(by='Jumlah', ascending=True)
-                    fig_val = px.bar(grp_sorted, x='Jumlah', y='Level 2', orientation='h', title="Distribusi Listing per SKPD", text_auto=True, height=600)
+                    fig_val = px.bar(
+                        grp_sorted, x='Jumlah', y='Level 2', orientation='h', 
+                        title="Distribusi Listing per SKPD", text='Jumlah', height=600
+                    )
+                    # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
+                    fig_val.update_traces(textposition='outside')
+                    fig_val.update_layout(margin=dict(r=50))
+                    # ------------------------------------------------
+                    
                     st.plotly_chart(fig_val, use_container_width=True)
 
                 tampilkan_dan_download(grp, "Rekap_Validasi_Listing")
