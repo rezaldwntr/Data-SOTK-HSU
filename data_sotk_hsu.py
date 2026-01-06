@@ -16,12 +16,12 @@ st.set_page_config(
         'Get Help': 'https://www.linkedin.com/in/rezaldwntr/',
         'Report a bug': "https://github.com/rezaldwntr/data-sotk-hsu/issues",
         'About': """
-        ### Dashboard Analisis SOTK HSU v3.1
+        ### Dashboard Analisis SOTK HSU v3.2
         Aplikasi ini dikembangkan untuk membantu analisis struktur organisasi
         Pemerintah Kabupaten Hulu Sungai Utara.
         
         **Fitur Baru:**
-        - Visualisasi Distribusi Jabatan (Eselon/Jenis)
+        - Klasifikasi Jabatan Spesifik (Eselon II, III, IV, Fungsional, Pelaksana)
         - Layout Grafik Vertikal
         
         Developed by **Rezal Dewantara**
@@ -131,12 +131,6 @@ def process_sotk_data(df):
     
     if 'DIATASAN ID' in df.columns:
         df['DIATASAN ID'] = df['DIATASAN ID'].astype(str).str.strip().replace(['nan', 'None', '', 'NaN'], np.nan)
-
-    # Pastikan Kolom Jabatan Ada
-    if 'ESELON' not in df.columns:
-        df['ESELON'] = ''
-    if 'JENIS JABATAN' not in df.columns:
-        df['JENIS JABATAN'] = ''
 
     # Dictionary Mapping
     parent_map = df.set_index('ID')['DIATASAN ID'].to_dict()
@@ -256,65 +250,81 @@ if file_sotk is not None:
 
         st.divider()
 
-        # 2. Distribusi Jabatan (Posisi Bawah)
-        st.markdown("#### 2. Distribusi Jenis Jabatan")
+        # 2. Distribusi Jabatan (Posisi Bawah, Vertikal)
+        st.markdown("#### 2. Distribusi Jabatan")
         
-        # Logic Klasifikasi Jabatan
+        # Logic Klasifikasi Jabatan (Sesuai Permintaan)
         if 'ESELON' in df.columns and 'JENIS JABATAN' in df.columns:
             def klasifikasi_jabatan(row):
                 eselon = str(row['ESELON']).strip().upper()
                 jenis = str(row['JENIS JABATAN']).strip().upper()
                 
-                if 'II' in eselon:
+                # Cek Struktural Berdasarkan Eselon
+                if 'II' in eselon: # Mencakup II.a, II.b
                     return 'JABATAN PIMPINAN TINGGI PRATAMA (Eselon II)'
-                elif 'III' in eselon:
+                elif 'III' in eselon: # Mencakup III.a, III.b
                     return 'JABATAN ADMINISTRATOR (Eselon III)'
-                elif 'IV' in eselon:
+                elif 'IV' in eselon: # Mencakup IV.a, IV.b
                     return 'JABATAN PENGAWAS (Eselon IV)'
-                elif 'FUNGSIONAL' in jenis:
+                
+                # Cek Fungsional dan Pelaksana Berdasarkan Jenis Jabatan
+                if 'FUNGSIONAL' in jenis:
                     return 'JABATAN FUNGSIONAL'
                 elif 'PELAKSANA' in jenis:
                     return 'JABATAN PELAKSANA'
-                else:
-                    return 'LAINNYA'
+                
+                return None # Kategori 'Lainnya' akan dibuang (None)
 
             df_viz = df.copy()
             df_viz['KELOMPOK_JABATAN'] = df_viz.apply(klasifikasi_jabatan, axis=1)
             
+            # Filter hanya kategori yang valid (Hapus 'None' / Lainnya)
+            df_viz = df_viz.dropna(subset=['KELOMPOK_JABATAN'])
+            
             # Hitung Jumlah
             jabatan_stats = df_viz.groupby('KELOMPOK_JABATAN').size().reset_index(name='Jumlah')
-            # Filter 'LAINNYA' jika tidak diinginkan, atau biarkan agar terlihat data yg belum tercover
-            # jabatan_stats = jabatan_stats[jabatan_stats['KELOMPOK_JABATAN'] != 'LAINNYA'] 
             
-            # Urutkan custom (Opsional, agar urutan Eselon rapi)
+            # Urutan Kategori yang diinginkan
             urutan_custom = [
                 'JABATAN PIMPINAN TINGGI PRATAMA (Eselon II)',
                 'JABATAN ADMINISTRATOR (Eselon III)',
                 'JABATAN PENGAWAS (Eselon IV)',
                 'JABATAN FUNGSIONAL',
-                'JABATAN PELAKSANA',
-                'LAINNYA'
+                'JABATAN PELAKSANA'
             ]
-            jabatan_stats['KELOMPOK_JABATAN'] = pd.Categorical(jabatan_stats['KELOMPOK_JABATAN'], categories=urutan_custom, ordered=True)
+            
+            # Terapkan urutan
+            jabatan_stats['KELOMPOK_JABATAN'] = pd.Categorical(
+                jabatan_stats['KELOMPOK_JABATAN'], 
+                categories=urutan_custom, 
+                ordered=True
+            )
             jabatan_stats = jabatan_stats.sort_values('KELOMPOK_JABATAN')
 
-            fig_jab = px.bar(
-                jabatan_stats,
-                x='Jumlah',
-                y='KELOMPOK_JABATAN',
-                orientation='h',
-                text_auto=True,
-                title="Jumlah Pegawai per Kelompok Jabatan",
-                color='KELOMPOK_JABATAN',
-                height=450
-            )
-            fig_jab.update_layout(showlegend=False)
-            st.plotly_chart(fig_jab, use_container_width=True)
-            
-            with st.expander("Lihat Detail Data Distribusi Jabatan"):
-                st.dataframe(jabatan_stats)
+            # Plot Chart
+            if not jabatan_stats.empty:
+                fig_jab = px.bar(
+                    jabatan_stats,
+                    x='Jumlah',
+                    y='KELOMPOK_JABATAN',
+                    orientation='h',
+                    text_auto=True,
+                    title="Jumlah Pegawai per Kelompok Jabatan",
+                    color='KELOMPOK_JABATAN',
+                    height=500
+                )
+                fig_jab.update_layout(
+                    showlegend=False,
+                    yaxis=dict(autorange="reversed") # Agar urutan dari atas (Eselon II) ke bawah
+                )
+                st.plotly_chart(fig_jab, use_container_width=True)
+                
+                with st.expander("Lihat Detail Data Distribusi Jabatan"):
+                    tampilkan_dan_download(jabatan_stats, "Distribusi_Jabatan")
+            else:
+                st.warning("Tidak ada data jabatan yang sesuai dengan kriteria filter.")
         else:
-            st.warning("Kolom 'ESELON' atau 'JENIS JABATAN' tidak ditemukan dalam file.")
+            st.warning("Kolom 'ESELON' atau 'JENIS JABATAN' tidak ditemukan dalam file untuk membuat grafik distribusi.")
 
         st.divider()
         if 'Level 2' in df.columns and 'Level 3' in df.columns:
