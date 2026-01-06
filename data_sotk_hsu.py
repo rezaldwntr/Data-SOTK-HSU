@@ -11,7 +11,22 @@ st.set_page_config(
     page_title="Dashboard SOTK HSU",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://www.linkedin.com/in/rezaldwntr/',
+        'Report a bug': "https://github.com/rezaldwntr/data-sotk-hsu/issues",
+        'About': """
+        ### Dashboard Analisis SOTK HSU v3.1
+        Aplikasi ini dikembangkan untuk membantu analisis struktur organisasi
+        Pemerintah Kabupaten Hulu Sungai Utara.
+        
+        **Fitur Baru:**
+        - Visualisasi Distribusi Jabatan (Eselon/Jenis)
+        - Layout Grafik Vertikal
+        
+        Developed by **Rezal Dewantara**
+        """
+    }
 )
 
 # CSS Modern
@@ -97,9 +112,7 @@ def tampilkan_dan_download(df_input, file_label, height=None):
     except Exception as e:
         st.error(f"Gagal membuat tombol download: {e}")
 
-# --- 3. CACHING & DATA PROCESSING (OPTIMALISASI PERFORMA) ---
-# @st.cache_data membuat hasil pemrosesan disimpan di memori.
-# Jika file tidak berubah, Streamlit tidak akan menghitung ulang hierarki (Aplikasi jadi super cepat).
+# --- 3. CACHING & DATA PROCESSING ---
 @st.cache_data(show_spinner=False)
 def process_sotk_data(df):
     # Standarisasi Header
@@ -119,12 +132,17 @@ def process_sotk_data(df):
     if 'DIATASAN ID' in df.columns:
         df['DIATASAN ID'] = df['DIATASAN ID'].astype(str).str.strip().replace(['nan', 'None', '', 'NaN'], np.nan)
 
+    # Pastikan Kolom Jabatan Ada
+    if 'ESELON' not in df.columns:
+        df['ESELON'] = ''
+    if 'JENIS JABATAN' not in df.columns:
+        df['JENIS JABATAN'] = ''
+
     # Dictionary Mapping
     parent_map = df.set_index('ID')['DIATASAN ID'].to_dict()
     name_map = df.set_index('ID')['NAMA UNOR'].to_dict()
 
     # --- DETEKSI ORPHAN (DATA YATIM) ---
-    # Mencari ID yang punya atasan, tapi ID atasannya tidak ada di daftar ID
     orphans = df[df['DIATASAN ID'].notna() & ~df['DIATASAN ID'].isin(df['ID'])].copy()
 
     # Recursive Lineage Logic
@@ -170,7 +188,6 @@ st.subheader("Pemerintah Kabupaten Hulu Sungai Utara")
 st.markdown("---")
 
 if file_sotk is not None:
-    # Load File Wrapper
     try:
         if file_sotk.name.endswith('.csv'):
             raw_df = pd.read_csv(file_sotk)
@@ -180,23 +197,20 @@ if file_sotk is not None:
         st.error(f"Gagal membaca file: {e}")
         st.stop()
 
-    # --- PROSES DATA DENGAN CACHE ---
     with st.spinner('Sedang memproses struktur organisasi...'):
         df, orphans = process_sotk_data(raw_df)
         
-        if df is None: # Jika ada error validasi di dalam fungsi
-            st.error(orphans) # orphans berisi pesan error string disini
+        if df is None:
+            st.error(orphans)
             st.stop()
 
-    # --- ALERT DATA YATIM (HEALTH CHECK) ---
     if not orphans.empty:
         with st.sidebar:
             st.markdown("### ⚠️ Data Quality Alert")
-            st.warning(f"Ditemukan **{len(orphans)}** unit kerja 'Yatim' (Punya Atasan ID, tapi ID tersebut tidak ada di database).")
+            st.warning(f"Ditemukan **{len(orphans)}** unit kerja 'Yatim'.")
             with st.expander("Lihat Data Yatim"):
                 st.dataframe(orphans[['ID', 'NAMA UNOR', 'DIATASAN ID']])
 
-    # --- METRICS ---
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Jabatan/Unit", f"{len(df):,}")
     c2.metric("Total Kebutuhan", f"{int(df['TOTAL KEBUTUHAN'].sum()):,}")
@@ -221,39 +235,86 @@ if file_sotk is not None:
     with tab1:
         st.markdown("### 📈 Visualisasi Data SOTK")
         
-        col_viz1, col_viz2 = st.columns(2)
-        
-        with col_viz1:
-            st.markdown("#### 1. Top 10 SKPD (Kebutuhan)")
-            if 'Level 2' in df.columns:
-                skpd_stats = df[df['Level 2'] != '-'].groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
-                skpd_stats = skpd_stats.sort_values(by='TOTAL KEBUTUHAN', ascending=False).head(10)
-                
-                fig_bar = px.bar(
-                    skpd_stats,
-                    x='TOTAL KEBUTUHAN',
-                    y='Level 2',
-                    orientation='h',
-                    text_auto=True,
-                    color='TOTAL KEBUTUHAN',
-                    color_continuous_scale='Viridis'
-                )
-                fig_bar.update_layout(yaxis=dict(autorange="reversed"))
-                st.plotly_chart(fig_bar, use_container_width=True)
-
-        with col_viz2:
-            st.markdown("#### 2. Distribusi Unit per Level")
-            level_counts = []
-            for i in range(1, 7):
-                col_name = f'Level {i}'
-                if col_name in df.columns:
-                    # Hitung yang tidak kosong/-
-                    count = df[df[col_name] != '-'][col_name].nunique()
-                    level_counts.append({'Level': f'Level {i}', 'Jumlah Unit Unik': count})
+        # 1. Top 10 SKPD (Posisi Atas)
+        st.markdown("#### 1. Top 10 SKPD dengan Kebutuhan Terbanyak")
+        if 'Level 2' in df.columns:
+            skpd_stats = df[df['Level 2'] != '-'].groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
+            skpd_stats = skpd_stats.sort_values(by='TOTAL KEBUTUHAN', ascending=False).head(10)
             
-            df_levels = pd.DataFrame(level_counts)
-            fig_pie = px.bar(df_levels, x='Level', y='Jumlah Unit Unik', text_auto=True, title="Jumlah Unit Organisasi per Level Hierarki")
-            st.plotly_chart(fig_pie, use_container_width=True)
+            fig_bar = px.bar(
+                skpd_stats,
+                x='TOTAL KEBUTUHAN',
+                y='Level 2',
+                orientation='h',
+                text_auto=True,
+                color='TOTAL KEBUTUHAN',
+                color_continuous_scale='Viridis',
+                height=400
+            )
+            fig_bar.update_layout(yaxis=dict(autorange="reversed"))
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        st.divider()
+
+        # 2. Distribusi Jabatan (Posisi Bawah)
+        st.markdown("#### 2. Distribusi Jenis Jabatan")
+        
+        # Logic Klasifikasi Jabatan
+        if 'ESELON' in df.columns and 'JENIS JABATAN' in df.columns:
+            def klasifikasi_jabatan(row):
+                eselon = str(row['ESELON']).strip().upper()
+                jenis = str(row['JENIS JABATAN']).strip().upper()
+                
+                if 'II' in eselon:
+                    return 'JABATAN PIMPINAN TINGGI PRATAMA (Eselon II)'
+                elif 'III' in eselon:
+                    return 'JABATAN ADMINISTRATOR (Eselon III)'
+                elif 'IV' in eselon:
+                    return 'JABATAN PENGAWAS (Eselon IV)'
+                elif 'FUNGSIONAL' in jenis:
+                    return 'JABATAN FUNGSIONAL'
+                elif 'PELAKSANA' in jenis:
+                    return 'JABATAN PELAKSANA'
+                else:
+                    return 'LAINNYA'
+
+            df_viz = df.copy()
+            df_viz['KELOMPOK_JABATAN'] = df_viz.apply(klasifikasi_jabatan, axis=1)
+            
+            # Hitung Jumlah
+            jabatan_stats = df_viz.groupby('KELOMPOK_JABATAN').size().reset_index(name='Jumlah')
+            # Filter 'LAINNYA' jika tidak diinginkan, atau biarkan agar terlihat data yg belum tercover
+            # jabatan_stats = jabatan_stats[jabatan_stats['KELOMPOK_JABATAN'] != 'LAINNYA'] 
+            
+            # Urutkan custom (Opsional, agar urutan Eselon rapi)
+            urutan_custom = [
+                'JABATAN PIMPINAN TINGGI PRATAMA (Eselon II)',
+                'JABATAN ADMINISTRATOR (Eselon III)',
+                'JABATAN PENGAWAS (Eselon IV)',
+                'JABATAN FUNGSIONAL',
+                'JABATAN PELAKSANA',
+                'LAINNYA'
+            ]
+            jabatan_stats['KELOMPOK_JABATAN'] = pd.Categorical(jabatan_stats['KELOMPOK_JABATAN'], categories=urutan_custom, ordered=True)
+            jabatan_stats = jabatan_stats.sort_values('KELOMPOK_JABATAN')
+
+            fig_jab = px.bar(
+                jabatan_stats,
+                x='Jumlah',
+                y='KELOMPOK_JABATAN',
+                orientation='h',
+                text_auto=True,
+                title="Jumlah Pegawai per Kelompok Jabatan",
+                color='KELOMPOK_JABATAN',
+                height=450
+            )
+            fig_jab.update_layout(showlegend=False)
+            st.plotly_chart(fig_jab, use_container_width=True)
+            
+            with st.expander("Lihat Detail Data Distribusi Jabatan"):
+                st.dataframe(jabatan_stats)
+        else:
+            st.warning("Kolom 'ESELON' atau 'JENIS JABATAN' tidak ditemukan dalam file.")
 
         st.divider()
         if 'Level 2' in df.columns and 'Level 3' in df.columns:
