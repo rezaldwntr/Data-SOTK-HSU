@@ -15,10 +15,10 @@ st.set_page_config(
     menu_items={
         'Get Help': 'https://www.linkedin.com/in/rezaldwntr/',
         'About': """
-        ### Dashboard Analisis SOTK HSU v3.4
+        ### Dashboard Analisis SOTK HSU v3.5
         **Fitur Baru:**
-        - Filter Statistik SKPD (Exclude Bupati/Wabup)
-        - Grafik Sektoral (Pendidikan & Kesehatan)
+        - Interaksi Grafik: Klik bar untuk lihat detail data.
+        - Re-ordering Layout Visualisasi.
         """
     }
 )
@@ -174,15 +174,13 @@ if file_sotk is not None:
         with st.sidebar:
             st.warning(f"⚠️ Ditemukan **{len(orphans)}** unit kerja 'Yatim'.")
 
-    # --- METRICS UTAMA (DIPERBAIKI) ---
+    # --- METRICS UTAMA ---
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Jabatan/Unit", f"{len(df):,}")
     c2.metric("Total Kebutuhan", f"{int(df['TOTAL KEBUTUHAN'].sum()):,}")
     
-    # LOGIKA BARU: HITUNG SKPD (Exclude -, Bupati, Wakil Bupati)
     if 'Level 2' in df.columns:
         skpd_raw = df['Level 2'].unique()
-        # Filter: Tidak kosong, tidak mengandung kata BUPATI atau WAKIL
         valid_skpd = [
             x for x in skpd_raw 
             if str(x) != '-' 
@@ -213,7 +211,7 @@ if file_sotk is not None:
         # 1. Top 10 SKPD
         st.markdown("#### 1. Top 10 SKPD (Kebutuhan Pegawai)")
         if 'Level 2' in df.columns:
-            skpd_df = df[df['Level 2'].isin(valid_skpd)] # Pakai list valid yg sudah difilter
+            skpd_df = df[df['Level 2'].isin(valid_skpd)]
             skpd_stats = skpd_df.groupby('Level 2')['TOTAL KEBUTUHAN'].sum().reset_index()
             skpd_stats = skpd_stats.sort_values(by='TOTAL KEBUTUHAN', ascending=False).head(10)
             
@@ -226,69 +224,10 @@ if file_sotk is not None:
 
         st.divider()
 
-        # 2. Grafik Sektoral (Pendidikan & Kesehatan) - FITUR BARU
-        st.markdown("#### 2. Statistik Sektoral (Unit Kerja)")
-        col_sec1, col_sec2 = st.columns(2)
-
-        # --- A. PENDIDIKAN (TK, SD, SMP) ---
-        with col_sec1:
-            st.markdown("**A. Pendidikan (Jumlah Sekolah)**")
-            
-            def cek_pendidikan(nama):
-                n = str(nama).upper()
-                if 'TK ' in n or n.startswith('TK ') or 'TAMAN KANAK' in n: return 'TK'
-                if 'SD ' in n or n.startswith('SD ') or 'SEKOLAH DASAR' in n: return 'SD'
-                if 'SMP ' in n or n.startswith('SMP ') or 'SEKOLAH MENENGAH' in n: return 'SMP'
-                return None
-
-            df_pend = df.copy()
-            df_pend['KATEGORI'] = df_pend['NAMA UNOR'].apply(cek_pendidikan)
-            df_pend = df_pend.dropna(subset=['KATEGORI'])
-            
-            if not df_pend.empty:
-                stats_pend = df_pend.groupby('KATEGORI').size().reset_index(name='Jumlah Unit')
-                # Urutkan TK -> SD -> SMP
-                urutan_pend = ['TK', 'SD', 'SMP']
-                stats_pend['KATEGORI'] = pd.Categorical(stats_pend['KATEGORI'], categories=urutan_pend, ordered=True)
-                stats_pend = stats_pend.sort_values('KATEGORI')
-
-                fig_pend = px.bar(
-                    stats_pend, x='KATEGORI', y='Jumlah Unit', text_auto=True,
-                    color='KATEGORI', title="Jumlah Sekolah (TK, SD, SMP)"
-                )
-                st.plotly_chart(fig_pend, use_container_width=True)
-            else:
-                st.info("Tidak ditemukan data sekolah (TK/SD/SMP).")
-
-        # --- B. KESEHATAN (RS, PUSKESMAS, FARMASI) ---
-        with col_sec2:
-            st.markdown("**B. Kesehatan (Fasilitas)**")
-            
-            def cek_kesehatan(nama):
-                n = str(nama).upper()
-                if 'RUMAH SAKIT' in n or 'RSUD' in n: return 'RUMAH SAKIT'
-                if 'PUSKESMAS' in n: return 'PUSKESMAS'
-                if 'FARMASI' in n and 'INSTALASI' in n: return 'INSTALASI FARMASI'
-                return None
-
-            df_kes = df.copy()
-            df_kes['KATEGORI'] = df_kes['NAMA UNOR'].apply(cek_kesehatan)
-            df_kes = df_kes.dropna(subset=['KATEGORI'])
-            
-            if not df_kes.empty:
-                stats_kes = df_kes.groupby('KATEGORI').size().reset_index(name='Jumlah Unit')
-                fig_kes = px.bar(
-                    stats_kes, x='KATEGORI', y='Jumlah Unit', text_auto=True,
-                    color='KATEGORI', title="Fasilitas Kesehatan"
-                )
-                st.plotly_chart(fig_kes, use_container_width=True)
-            else:
-                st.info("Tidak ditemukan data kesehatan (RS/Puskesmas/Farmasi).")
-
-        st.divider()
-
-        # 3. Distribusi Jabatan
-        st.markdown("#### 3. Distribusi Jabatan")
+        # 2. Distribusi Jabatan (DIPINDAHKAN KE POSISI 2 & INTERAKTIF)
+        st.markdown("#### 2. Distribusi Jabatan")
+        st.caption("👇 **Klik pada salah satu batang diagram di bawah ini** untuk melihat detail data jabatan.")
+        
         if 'ESELON' in df.columns and 'JENIS JABATAN' in df.columns:
             def klasifikasi_jabatan_smart(row):
                 eselon = str(row['ESELON']).strip().upper() if pd.notna(row['ESELON']) else ''
@@ -327,18 +266,90 @@ if file_sotk is not None:
                     color='KELOMPOK_JABATAN', height=500
                 )
                 fig_jab.update_layout(showlegend=False, yaxis=dict(autorange="reversed"))
-                st.plotly_chart(fig_jab, use_container_width=True)
-                with st.expander("Lihat Detail Data Distribusi Jabatan"):
-                    tampilkan_dan_download(jabatan_stats, "Distribusi_Jabatan")
+                
+                # --- INTERAKSI KLIK ---
+                # Menggunakan on_select='rerun' untuk menangkap klik user
+                event = st.plotly_chart(fig_jab, use_container_width=True, on_select="rerun")
+                
+                # Cek apakah ada yang diklik
+                selected_jabatan = None
+                if event and len(event['selection']['points']) > 0:
+                    # Ambil label y (kategori jabatan) dari poin yang diklik
+                    selected_jabatan = event['selection']['points'][0]['y']
+                
+                if selected_jabatan:
+                    st.info(f"📂 Menampilkan Detail Data: **{selected_jabatan}**")
+                    detail_data = df_viz[df_viz['KELOMPOK_JABATAN'] == selected_jabatan].copy()
+                    
+                    # Tampilkan data dengan tombol download
+                    tampilkan_dan_download(detail_data, f"Detail_{selected_jabatan}")
+                else:
+                    st.caption("💡 *Tips: Klik batang grafik di atas untuk melihat siapa saja pegawai/jabatan di dalamnya.*")
             else:
                 st.warning("Tidak ada data jabatan yang sesuai kriteria.")
+        else:
+            st.error("Kolom 'ESELON' atau 'JENIS JABATAN' tidak ditemukan.")
+
+        st.divider()
+
+        # 3. Statistik Sektoral (Posisi Turun ke 3)
+        st.markdown("#### 3. Statistik Sektoral (Unit Kerja)")
+        col_sec1, col_sec2 = st.columns(2)
+
+        with col_sec1:
+            st.markdown("**A. Pendidikan (Jumlah Sekolah)**")
+            def cek_pendidikan(nama):
+                n = str(nama).upper()
+                if 'TK ' in n or n.startswith('TK ') or 'TAMAN KANAK' in n: return 'TK'
+                if 'SD ' in n or n.startswith('SD ') or 'SEKOLAH DASAR' in n: return 'SD'
+                if 'SMP ' in n or n.startswith('SMP ') or 'SEKOLAH MENENGAH' in n: return 'SMP'
+                return None
+
+            df_pend = df.copy()
+            df_pend['KATEGORI'] = df_pend['NAMA UNOR'].apply(cek_pendidikan)
+            df_pend = df_pend.dropna(subset=['KATEGORI'])
+            
+            if not df_pend.empty:
+                stats_pend = df_pend.groupby('KATEGORI').size().reset_index(name='Jumlah Unit')
+                urutan_pend = ['TK', 'SD', 'SMP']
+                stats_pend['KATEGORI'] = pd.Categorical(stats_pend['KATEGORI'], categories=urutan_pend, ordered=True)
+                stats_pend = stats_pend.sort_values('KATEGORI')
+
+                fig_pend = px.bar(
+                    stats_pend, x='KATEGORI', y='Jumlah Unit', text_auto=True,
+                    color='KATEGORI', title="Jumlah Sekolah"
+                )
+                st.plotly_chart(fig_pend, use_container_width=True)
+            else:
+                st.info("Tidak ditemukan data sekolah.")
+
+        with col_sec2:
+            st.markdown("**B. Kesehatan (Fasilitas)**")
+            def cek_kesehatan(nama):
+                n = str(nama).upper()
+                if 'RUMAH SAKIT' in n or 'RSUD' in n: return 'RUMAH SAKIT'
+                if 'PUSKESMAS' in n: return 'PUSKESMAS'
+                if 'FARMASI' in n and 'INSTALASI' in n: return 'INSTALASI FARMASI'
+                return None
+
+            df_kes = df.copy()
+            df_kes['KATEGORI'] = df_kes['NAMA UNOR'].apply(cek_kesehatan)
+            df_kes = df_kes.dropna(subset=['KATEGORI'])
+            
+            if not df_kes.empty:
+                stats_kes = df_kes.groupby('KATEGORI').size().reset_index(name='Jumlah Unit')
+                fig_kes = px.bar(
+                    stats_kes, x='KATEGORI', y='Jumlah Unit', text_auto=True,
+                    color='KATEGORI', title="Fasilitas Kesehatan"
+                )
+                st.plotly_chart(fig_kes, use_container_width=True)
+            else:
+                st.info("Tidak ditemukan data kesehatan.")
 
     # === TAB 2: SKPD ===
     with tab2:
         if 'Level 2' in df.columns:
-            # Gunakan list valid_skpd yang sudah difilter di atas
             sorted_skpd = sorted(valid_skpd)
-            
             col_filter, col_view = st.columns([1, 3])
             with col_filter:
                 pilihdinas = st.selectbox("Pilih Unit Organisasi (Level 2)", sorted_skpd)
