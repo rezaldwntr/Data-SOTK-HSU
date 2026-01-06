@@ -16,12 +16,12 @@ st.set_page_config(
         'Get Help': 'https://www.linkedin.com/in/rezaldwntr/',
         'Report a bug': "https://github.com/rezaldwntr/data-sotk-hsu/issues",
         'About': """
-        ### Dashboard Analisis SOTK HSU v3.2
+        ### Dashboard Analisis SOTK HSU v3.3
         Aplikasi ini dikembangkan untuk membantu analisis struktur organisasi
         Pemerintah Kabupaten Hulu Sungai Utara.
         
         **Fitur Baru:**
-        - Klasifikasi Jabatan Spesifik (Eselon II, III, IV, Fungsional, Pelaksana)
+        - Klasifikasi Jabatan Cerdas (Mendeteksi Romawi & Angka Eselon)
         - Layout Grafik Vertikal
         
         Developed by **Rezal Dewantara**
@@ -253,38 +253,64 @@ if file_sotk is not None:
         # 2. Distribusi Jabatan (Posisi Bawah, Vertikal)
         st.markdown("#### 2. Distribusi Jabatan")
         
-        # Logic Klasifikasi Jabatan (Sesuai Permintaan)
-        if 'ESELON' in df.columns and 'JENIS JABATAN' in df.columns:
-            def klasifikasi_jabatan(row):
-                eselon = str(row['ESELON']).strip().upper()
-                jenis = str(row['JENIS JABATAN']).strip().upper()
+        # --- LOGIKA KLASIFIKASI JABATAN YANG DIPERBAIKI (ROBUST) ---
+        # Kita cek kolom ESELON, JENIS JABATAN, dan JENJANG JABATAN
+        # Agar bisa menangkap 'IV' (Romawi) maupun '41' (Angka Kode)
+        
+        can_classify = False
+        cols_needed = ['ESELON', 'JENIS JABATAN']
+        
+        # Cek ketersediaan kolom
+        if all(col in df.columns for col in cols_needed):
+            can_classify = True
+        
+        if can_classify:
+            def klasifikasi_jabatan_smart(row):
+                # Ambil nilai dan bersihkan
+                eselon = str(row['ESELON']).strip().upper() if pd.notna(row['ESELON']) else ''
+                jenis = str(row['JENIS JABATAN']).strip().upper() if pd.notna(row['JENIS JABATAN']) else ''
                 
-                # Cek Struktural Berdasarkan Eselon
-                if 'II' in eselon: # Mencakup II.a, II.b
+                # Cek kolom tambahan JENJANG JABATAN jika ada
+                jenjang = ''
+                if 'JENJANG JABATAN' in row and pd.notna(row['JENJANG JABATAN']):
+                    jenjang = str(row['JENJANG JABATAN']).strip().upper()
+
+                # --- 1. ESELON II (PIMPINAN TINGGI PRATAMA) ---
+                # Cek: Romawi 'II', Kode '21/22', atau Teks 'PIMPINAN TINGGI'
+                if ('II' in eselon) or (eselon in ['21', '22']) or ('PIMPINAN TINGGI' in jenjang):
                     return 'JABATAN PIMPINAN TINGGI PRATAMA (Eselon II)'
-                elif 'III' in eselon: # Mencakup III.a, III.b
+                
+                # --- 2. ESELON III (ADMINISTRATOR) ---
+                # Cek: Romawi 'III', Kode '31/32', atau Teks 'ADMINISTRATOR'
+                elif ('III' in eselon) or (eselon in ['31', '32']) or ('ADMINISTRATOR' in jenjang):
                     return 'JABATAN ADMINISTRATOR (Eselon III)'
-                elif 'IV' in eselon: # Mencakup IV.a, IV.b
+                
+                # --- 3. ESELON IV (PENGAWAS) ---
+                # Cek: Romawi 'IV', Kode '41/42', atau Teks 'PENGAWAS'
+                elif ('IV' in eselon) or (eselon in ['41', '42']) or ('PENGAWAS' in jenjang):
                     return 'JABATAN PENGAWAS (Eselon IV)'
                 
-                # Cek Fungsional dan Pelaksana Berdasarkan Jenis Jabatan
-                if 'FUNGSIONAL' in jenis:
-                    return 'JABATAN FUNGSIONAL'
-                elif 'PELAKSANA' in jenis:
+                # --- 4. FUNGSIONAL & PELAKSANA ---
+                # Prioritas Pelaksana: Cek kata 'PELAKSANA' atau 'FUNGSIONAL UMUM' (istilah lama Pelaksana)
+                if 'PELAKSANA' in jenis or 'PELAKSANA' in jenjang or 'FUNGSIONAL UMUM' in jenis or 'FUNGSIONAL UMUM' in jenjang:
                     return 'JABATAN PELAKSANA'
                 
-                return None # Kategori 'Lainnya' akan dibuang (None)
+                # Prioritas Fungsional: Cek kata 'FUNGSIONAL' (Biasanya Fungsional Tertentu)
+                if 'FUNGSIONAL' in jenis or 'FUNGSIONAL' in jenjang:
+                    return 'JABATAN FUNGSIONAL'
+                
+                return None # Kategori lain dibuang
 
             df_viz = df.copy()
-            df_viz['KELOMPOK_JABATAN'] = df_viz.apply(klasifikasi_jabatan, axis=1)
+            df_viz['KELOMPOK_JABATAN'] = df_viz.apply(klasifikasi_jabatan_smart, axis=1)
             
-            # Filter hanya kategori yang valid (Hapus 'None' / Lainnya)
+            # Filter hanya kategori yang valid (Hapus None)
             df_viz = df_viz.dropna(subset=['KELOMPOK_JABATAN'])
             
             # Hitung Jumlah
             jabatan_stats = df_viz.groupby('KELOMPOK_JABATAN').size().reset_index(name='Jumlah')
             
-            # Urutan Kategori yang diinginkan
+            # Urutan Tampilan
             urutan_custom = [
                 'JABATAN PIMPINAN TINGGI PRATAMA (Eselon II)',
                 'JABATAN ADMINISTRATOR (Eselon III)',
@@ -315,14 +341,14 @@ if file_sotk is not None:
                 )
                 fig_jab.update_layout(
                     showlegend=False,
-                    yaxis=dict(autorange="reversed") # Agar urutan dari atas (Eselon II) ke bawah
+                    yaxis=dict(autorange="reversed") # Urutan dari atas ke bawah
                 )
                 st.plotly_chart(fig_jab, use_container_width=True)
                 
                 with st.expander("Lihat Detail Data Distribusi Jabatan"):
                     tampilkan_dan_download(jabatan_stats, "Distribusi_Jabatan")
             else:
-                st.warning("Tidak ada data jabatan yang sesuai dengan kriteria filter.")
+                st.warning("Tidak ada data jabatan yang sesuai dengan kriteria filter (Eselon/Fungsional/Pelaksana).")
         else:
             st.warning("Kolom 'ESELON' atau 'JENIS JABATAN' tidak ditemukan dalam file untuk membuat grafik distribusi.")
 
