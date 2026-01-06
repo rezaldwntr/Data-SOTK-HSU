@@ -15,9 +15,9 @@ st.set_page_config(
     menu_items={
         'Get Help': 'https://www.linkedin.com/in/rezaldwntr/',
         'About': """
-        ### Dashboard Analisis SOTK HSU v3.8
+        ### Dashboard Analisis SOTK HSU v3.9
         **Fitur Baru:**
-        - Perbaikan Visual Grafik: Posisi teks angka diseragamkan (selalu di luar batang).
+        - Perbaikan Urutan Distribusi Jabatan (Eselon II Paling Atas).
         """
     }
 )
@@ -238,14 +238,12 @@ if file_sotk is not None:
             
             fig_bar = px.bar(
                 skpd_stats, x='TOTAL KEBUTUHAN', y='Level 2', orientation='h',
-                text='TOTAL KEBUTUHAN', # Explicit text
+                text='TOTAL KEBUTUHAN',
                 color='TOTAL KEBUTUHAN', color_continuous_scale='Viridis', height=400
             )
             
-            # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
             fig_bar.update_traces(textposition='outside')
-            fig_bar.update_layout(yaxis=dict(autorange="reversed"), margin=dict(r=50)) # Extra margin for text
-            # ------------------------------------------------
+            fig_bar.update_layout(yaxis=dict(autorange="reversed"), margin=dict(r=50))
 
             event_skpd = st.plotly_chart(fig_bar, use_container_width=True, on_select="rerun")
             
@@ -262,7 +260,7 @@ if file_sotk is not None:
 
         # --- 3. DISTRIBUSI JABATAN ---
         st.markdown("#### 3. Distribusi Jabatan")
-        st.caption("👇 Klik batang grafik untuk melihat detail.")
+        st.caption("👇 Klik batang grafik untuk melihat daftar pegawai/jabatan.")
         
         if 'ESELON' in df.columns and 'JENIS JABATAN' in df.columns:
             def klasifikasi_jabatan_smart(row):
@@ -287,24 +285,44 @@ if file_sotk is not None:
             df_viz = df_viz.dropna(subset=['KELOMPOK_JABATAN'])
             
             jabatan_stats = df_viz.groupby('KELOMPOK_JABATAN').size().reset_index(name='Jumlah')
+            
+            # URUTAN TAMPILAN YANG DIINGINKAN (TOP to BOTTOM)
             urutan_custom = [
-                'JABATAN PIMPINAN TINGGI PRATAMA (Eselon II)', 'JABATAN ADMINISTRATOR (Eselon III)',
-                'JABATAN PENGAWAS (Eselon IV)', 'JABATAN FUNGSIONAL', 'JABATAN PELAKSANA'
+                'JABATAN PIMPINAN TINGGI PRATAMA (Eselon II)', 
+                'JABATAN ADMINISTRATOR (Eselon III)',
+                'JABATAN PENGAWAS (Eselon IV)', 
+                'JABATAN FUNGSIONAL', 
+                'JABATAN PELAKSANA'
             ]
-            jabatan_stats['KELOMPOK_JABATAN'] = pd.Categorical(jabatan_stats['KELOMPOK_JABATAN'], categories=urutan_custom, ordered=True)
+            
+            # Terapkan categorical sorting
+            jabatan_stats['KELOMPOK_JABATAN'] = pd.Categorical(
+                jabatan_stats['KELOMPOK_JABATAN'], 
+                categories=urutan_custom, 
+                ordered=True
+            )
             jabatan_stats = jabatan_stats.sort_values('KELOMPOK_JABATAN')
 
             if not jabatan_stats.empty:
                 fig_jab = px.bar(
                     jabatan_stats, x='Jumlah', y='KELOMPOK_JABATAN', orientation='h',
-                    text='Jumlah', # Explicit text
+                    text='Jumlah',
                     color='KELOMPOK_JABATAN', height=500
                 )
                 
-                # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
                 fig_jab.update_traces(textposition='outside')
-                fig_jab.update_layout(showlegend=False, yaxis=dict(autorange="reversed"), margin=dict(r=50))
-                # ------------------------------------------------
+                
+                # UPDATE: Paksa Urutan Kategori menggunakan categoryarray + autorange reversed
+                # Ini memastikan 'urutan_custom[0]' (Eselon II) muncul di PALING ATAS
+                fig_jab.update_layout(
+                    showlegend=False, 
+                    yaxis=dict(
+                        categoryorder='array',
+                        categoryarray=urutan_custom,
+                        autorange="reversed" 
+                    ),
+                    margin=dict(r=50)
+                )
                 
                 event_jab = st.plotly_chart(fig_jab, use_container_width=True, on_select="rerun")
                 
@@ -352,9 +370,7 @@ if file_sotk is not None:
                     stats_pend, x='KATEGORI', y='Jumlah Unit', text='Jumlah Unit',
                     color='KATEGORI', title="Jumlah Sekolah"
                 )
-                # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
                 fig_pend.update_traces(textposition='outside')
-                # ------------------------------------------------
                 
                 event_pend = st.plotly_chart(fig_pend, use_container_width=True, on_select="rerun")
                 selected_pend = None
@@ -388,9 +404,7 @@ if file_sotk is not None:
                     stats_kes, x='KATEGORI', y='Jumlah Unit', text='Jumlah Unit',
                     color='KATEGORI', title="Fasilitas Kesehatan"
                 )
-                # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
                 fig_kes.update_traces(textposition='outside')
-                # ------------------------------------------------
 
                 event_kes = st.plotly_chart(fig_kes, use_container_width=True, on_select="rerun")
                 selected_kes = None
@@ -502,10 +516,8 @@ if file_sotk is not None:
                         grp_sorted, x='Jumlah', y='Level 2', orientation='h', 
                         title="Distribusi Listing per SKPD", text='Jumlah', height=600
                     )
-                    # --- UPDATE: SERAGAMKAN POSISI TEKS (OUTSIDE) ---
                     fig_val.update_traces(textposition='outside')
                     fig_val.update_layout(margin=dict(r=50))
-                    # ------------------------------------------------
                     
                     st.plotly_chart(fig_val, use_container_width=True)
 
